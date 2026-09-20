@@ -18,6 +18,8 @@ from reportlab.platypus import (
 BLUE = colors.HexColor("#0B5CAD")
 LIGHT_BLUE = colors.HexColor("#EAF2F8")
 GRAY = colors.HexColor("#5E6D78")
+DARK = colors.HexColor("#172B3A")
+YELLOW = colors.HexColor("#FFF4CC")
 
 
 def safe_text(value):
@@ -29,94 +31,143 @@ def safe_text(value):
 
 def money(value):
     try:
-        amount = float(value)
-        return f"${amount:,.0f}".replace(",", ".")
+        return f"${float(value):,.0f}".replace(",", ".")
     except (TypeError, ValueError):
         return "$0"
 
 
-def create_table(rows, widths=None, font_size=7):
+def create_table(
+    rows,
+    widths=None,
+    font_size=6.5,
+    header_rows=1,
+    padding=2.5,
+):
     table = Table(
         rows,
         colWidths=widths,
-        repeatRows=1,
+        repeatRows=header_rows,
+        hAlign="LEFT",
     )
 
-    table.setStyle(
-        TableStyle(
-            [
-                (
-                    "BACKGROUND",
-                    (0, 0),
-                    (-1, 0),
-                    BLUE,
-                ),
-                (
-                    "TEXTCOLOR",
-                    (0, 0),
-                    (-1, 0),
-                    colors.white,
-                ),
-                (
-                    "FONTNAME",
-                    (0, 0),
-                    (-1, 0),
-                    "Helvetica-Bold",
-                ),
-                (
-                    "FONTSIZE",
-                    (0, 0),
-                    (-1, -1),
-                    font_size,
-                ),
-                (
-                    "GRID",
-                    (0, 0),
-                    (-1, -1),
-                    0.4,
-                    colors.HexColor("#AAB7C2"),
-                ),
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "TOP",
-                ),
-                (
-                    "ROWBACKGROUNDS",
-                    (0, 1),
-                    (-1, -1),
-                    [colors.white, LIGHT_BLUE],
-                ),
-                (
-                    "LEFTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4,
-                ),
-                (
-                    "RIGHTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4,
-                ),
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4,
-                ),
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4,
-                ),
-            ]
-        )
-    )
+    style = [
+        (
+            "BACKGROUND",
+            (0, 0),
+            (-1, header_rows - 1),
+            BLUE,
+        ),
+        (
+            "TEXTCOLOR",
+            (0, 0),
+            (-1, header_rows - 1),
+            colors.white,
+        ),
+        (
+            "FONTNAME",
+            (0, 0),
+            (-1, header_rows - 1),
+            "Helvetica-Bold",
+        ),
+        (
+            "TEXTCOLOR",
+            (0, header_rows),
+            (-1, -1),
+            DARK,
+        ),
+        (
+            "FONTSIZE",
+            (0, 0),
+            (-1, -1),
+            font_size,
+        ),
+        (
+            "LEADING",
+            (0, 0),
+            (-1, -1),
+            font_size + 1.2,
+        ),
+        (
+            "GRID",
+            (0, 0),
+            (-1, -1),
+            0.3,
+            colors.HexColor("#AAB7C2"),
+        ),
+        (
+            "VALIGN",
+            (0, 0),
+            (-1, -1),
+            "MIDDLE",
+        ),
+        (
+            "ROWBACKGROUNDS",
+            (0, header_rows),
+            (-1, -1),
+            [colors.white, LIGHT_BLUE],
+        ),
+        (
+            "LEFTPADDING",
+            (0, 0),
+            (-1, -1),
+            padding,
+        ),
+        (
+            "RIGHTPADDING",
+            (0, 0),
+            (-1, -1),
+            padding,
+        ),
+        (
+            "TOPPADDING",
+            (0, 0),
+            (-1, -1),
+            padding,
+        ),
+        (
+            "BOTTOMPADDING",
+            (0, 0),
+            (-1, -1),
+            padding,
+        ),
+    ]
+
+    table.setStyle(TableStyle(style))
 
     return table
+
+
+def draw_page(canvas, document):
+    canvas.saveState()
+
+    page_width, _ = landscape(A4)
+
+    canvas.setStrokeColor(colors.HexColor("#C7D2DC"))
+    canvas.setLineWidth(0.4)
+
+    canvas.line(
+        8 * mm,
+        7 * mm,
+        page_width - 8 * mm,
+        7 * mm,
+    )
+
+    canvas.setFont("Helvetica", 6.5)
+    canvas.setFillColor(GRAY)
+
+    canvas.drawString(
+        8 * mm,
+        3.8 * mm,
+        "Borrador FUAS 2027 — Colegio Superior del Maipo",
+    )
+
+    canvas.drawRightString(
+        page_width - 8 * mm,
+        3.8 * mm,
+        f"Página {document.page}",
+    )
+
+    canvas.restoreState()
 
 
 def build_pdf(data):
@@ -125,71 +176,89 @@ def build_pdf(data):
     document = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        rightMargin=12 * mm,
-        leftMargin=12 * mm,
-        topMargin=12 * mm,
-        bottomMargin=12 * mm,
-        title="Borrador de antecedentes FUAS",
-        author="Aplicación Borrador FUAS",
+        rightMargin=8 * mm,
+        leftMargin=8 * mm,
+        topMargin=7 * mm,
+        bottomMargin=10 * mm,
+        title="Borrador FUAS 2027",
+        author="peqz",
+        allowSplitting=1,
     )
 
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
-        "FUASTitle",
+        "TitleCompact",
         parent=styles["Title"],
         textColor=BLUE,
-        fontSize=18,
-        leading=22,
+        fontSize=14,
+        leading=16,
+        spaceAfter=2,
+    )
+
+    subtitle_style = ParagraphStyle(
+        "SubtitleCompact",
+        parent=styles["Normal"],
+        textColor=DARK,
+        fontSize=7.5,
+        leading=9,
+        alignment=1,
+        spaceAfter=3,
     )
 
     section_style = ParagraphStyle(
-        "FUASSection",
+        "SectionCompact",
         parent=styles["Heading2"],
         textColor=BLUE,
-        fontSize=12,
-        leading=15,
-        spaceBefore=9,
-        spaceAfter=6,
+        fontSize=9,
+        leading=10,
+        spaceBefore=3,
+        spaceAfter=2,
     )
 
     note_style = ParagraphStyle(
-        "FUASNote",
+        "NoteCompact",
         parent=styles["Normal"],
         textColor=GRAY,
-        fontSize=8,
-        leading=11,
+        fontSize=6.5,
+        leading=8,
+        spaceAfter=2,
     )
 
     warning_style = ParagraphStyle(
-        "FUASWarning",
+        "WarningCompact",
         parent=styles["Normal"],
-        textColor=colors.HexColor("#7A4B00"),
-        backColor=colors.HexColor("#FFF4CC"),
+        textColor=colors.HexColor("#6A4300"),
+        backColor=YELLOW,
         borderColor=colors.HexColor("#E3A008"),
-        borderWidth=1,
-        borderPadding=8,
-        fontSize=9,
-        leading=12,
-        spaceAfter=8,
+        borderWidth=0.6,
+        borderPadding=4,
+        fontSize=7,
+        leading=8.5,
+        spaceBefore=2,
+        spaceAfter=3,
     )
 
     story = [
         Paragraph(
-            "BORRADOR DE ANTECEDENTES FUAS",
+            "BORRADOR FUAS 2027",
             title_style,
         ),
         Paragraph(
-            "<b>DOCUMENTO NO OFICIAL:</b> no constituye una "
-            "postulación ni un comprobante del Ministerio de Educación.",
+            "Uso exclusivo Colegio Superior del Maipo",
+            subtitle_style,
+        ),
+        Paragraph(
+            "<b>DESCARGO DE RESPONSABILIDAD:</b> esta herramienta "
+            "no realiza una postulación, no reemplaza a fuas.cl y "
+            "no genera un comprobante del Ministerio de Educación.",
             warning_style,
         ),
-        Spacer(1, 3 * mm),
     ]
 
-    # -----------------------------------------------------
-    # 1. POSTULANTE
-    # -----------------------------------------------------
+    # =====================================================
+    # PÁGINA 1
+    # =====================================================
 
     postulante = data.get("postulante", {})
 
@@ -205,38 +274,34 @@ def build_pdf(data):
             "Nombre completo",
             "Cédula de identidad",
             "Estado civil",
+            "Nacionalidad",
         ],
         [
             safe_text(postulante.get("nombre")),
             safe_text(postulante.get("rut")),
             safe_text(postulante.get("estado_civil")),
+            safe_text(postulante.get("nacionalidad")),
         ],
         [
-            "Nacionalidad",
             "Pueblo originario",
             "Nivel de estudio",
-        ],
-        [
-            safe_text(postulante.get("nacionalidad")),
-            safe_text(postulante.get("pueblo")),
-            safe_text(postulante.get("nivel")),
-        ],
-        [
             "Actividad",
             "Correo electrónico",
-            "Celular",
         ],
         [
+            safe_text(postulante.get("pueblo")),
+            safe_text(postulante.get("nivel")),
             safe_text(postulante.get("actividad")),
             safe_text(postulante.get("correo")),
-            safe_text(postulante.get("celular")),
         ],
         [
+            "Celular",
             "Dirección",
             "Comuna",
             "Región",
         ],
         [
+            safe_text(postulante.get("celular")),
             safe_text(postulante.get("direccion")),
             safe_text(postulante.get("comuna")),
             safe_text(postulante.get("region")),
@@ -246,14 +311,15 @@ def build_pdf(data):
     story.append(
         create_table(
             personal_rows,
-            widths=[87 * mm, 87 * mm, 87 * mm],
-            font_size=8,
+            widths=[
+                70 * mm,
+                68 * mm,
+                68 * mm,
+                70 * mm,
+            ],
+            font_size=6.7,
         )
     )
-
-    # -----------------------------------------------------
-    # 2. ANTECEDENTES ACADÉMICOS
-    # -----------------------------------------------------
 
     academicos = data.get("academicos", {})
 
@@ -268,7 +334,7 @@ def build_pdf(data):
         [
             "Establecimiento de egreso",
             "Promedio NEM",
-            "Enseñanza media cursada en Chile",
+            "Enseñanza media en Chile",
         ],
         [
             safe_text(
@@ -292,14 +358,14 @@ def build_pdf(data):
     story.append(
         create_table(
             academic_rows,
-            widths=[87 * mm, 87 * mm, 87 * mm],
-            font_size=8,
+            widths=[
+                92 * mm,
+                92 * mm,
+                92 * mm,
+            ],
+            font_size=6.7,
         )
     )
-
-    # -----------------------------------------------------
-    # 3. GRUPO FAMILIAR
-    # -----------------------------------------------------
 
     story.append(
         Paragraph(
@@ -345,40 +411,26 @@ def build_pdf(data):
         create_table(
             family_rows,
             widths=[
-                10 * mm,
+                9 * mm,
                 27 * mm,
-                43 * mm,
-                13 * mm,
-                28 * mm,
+                46 * mm,
+                12 * mm,
+                29 * mm,
                 31 * mm,
                 48 * mm,
-                61 * mm,
+                74 * mm,
             ],
-            font_size=6.5,
+            font_size=5.8,
+            padding=2,
         )
     )
 
-    # -----------------------------------------------------
-    # 4. SALUD
-    # -----------------------------------------------------
-
     story.append(
         Paragraph(
-            "4. Encuesta preparatoria de condición de salud",
+            "4. Antecedentes de salud",
             section_style,
         )
     )
-
-    story.append(
-        Paragraph(
-            "Esta sección es únicamente una ayuda para organizar "
-            "antecedentes. Las preguntas y documentos exigidos deben "
-            "confirmarse en el portal oficial.",
-            note_style,
-        )
-    )
-
-    story.append(Spacer(1, 2 * mm))
 
     health_records = data.get("salud", [])
 
@@ -388,8 +440,7 @@ def build_pdf(data):
             "Parentesco",
             "Condición prolongada",
             "Discapacidad",
-            "Tipo de condición",
-            "Duración",
+            "Condición / duración",
             "Tratamiento",
             "Gasto mensual",
             "Observaciones",
@@ -397,6 +448,17 @@ def build_pdf(data):
     ]
 
     for record in health_records:
+        condition_detail = "—"
+
+        if (
+            record.get("tipo_condicion")
+            or record.get("duracion")
+        ):
+            condition_detail = (
+                f"{safe_text(record.get('tipo_condicion'))} / "
+                f"{safe_text(record.get('duracion'))}"
+            )
+
         gasto = "No"
 
         if record.get("gastos_mensuales") == "Sí":
@@ -410,8 +472,7 @@ def build_pdf(data):
                     record.get("condicion_larga_duracion")
                 ),
                 safe_text(record.get("discapacidad")),
-                safe_text(record.get("tipo_condicion")),
-                safe_text(record.get("duracion")),
+                condition_detail,
                 safe_text(
                     record.get("tratamiento_permanente")
                 ),
@@ -423,8 +484,7 @@ def build_pdf(data):
     if len(health_rows) == 1:
         health_rows.append(
             [
-                "Sin respuestas registradas",
-                "—",
+                "Sin antecedentes registrados",
                 "—",
                 "—",
                 "—",
@@ -439,23 +499,31 @@ def build_pdf(data):
         create_table(
             health_rows,
             widths=[
-                35 * mm,
+                40 * mm,
+                28 * mm,
+                27 * mm,
                 25 * mm,
-                25 * mm,
-                22 * mm,
-                35 * mm,
-                22 * mm,
-                23 * mm,
-                25 * mm,
-                49 * mm,
+                48 * mm,
+                27 * mm,
+                28 * mm,
+                53 * mm,
             ],
-            font_size=6,
+            font_size=5.7,
+            padding=2,
         )
     )
 
-    # -----------------------------------------------------
-    # 5. INGRESOS
-    # -----------------------------------------------------
+    story.append(
+        Paragraph(
+            "La información de salud es preparatoria. Debe "
+            "confirmarse en el formulario oficial.",
+            note_style,
+        )
+    )
+
+    # =====================================================
+    # PÁGINA 2
+    # =====================================================
 
     story.append(PageBreak())
 
@@ -467,10 +535,14 @@ def build_pdf(data):
     )
 
     income_types = data.get("income_types", [])
+
     income_rows = [
-        ["Integrante", "Año"]
-        + income_types
-        + ["Total mensual"]
+        [
+            "Integrante",
+            "Año",
+            *income_types,
+            "Total",
+        ]
     ]
 
     for income_row in data.get("ingresos", []):
@@ -478,38 +550,54 @@ def build_pdf(data):
             [
                 safe_text(income_row.get("Nombre")),
                 safe_text(income_row.get("Año")),
+                *[
+                    money(income_row.get(income_type, 0))
+                    for income_type in income_types
+                ],
+                money(income_row.get("Total", 0)),
             ]
-            + [
-                money(income_row.get(income_type, 0))
-                for income_type in income_types
-            ]
-            + [money(income_row.get("Total", 0))]
         )
 
     if len(income_rows) == 1:
         income_rows.append(
-            ["Sin ingresos registrados", "—"]
-            + ["$0"] * len(income_types)
-            + ["$0"]
+            [
+                "Sin ingresos registrados",
+                "—",
+                *(["$0"] * len(income_types)),
+                "$0",
+            ]
         )
 
-    available_width = 273 * mm
-    fixed_width = 56 * mm
-    variable_width = (
-        available_width - fixed_width
-    ) / max(len(income_types), 1)
+    page_width = 276 * mm
+    name_width = 35 * mm
+    year_width = 12 * mm
+    total_width = 21 * mm
 
-    income_widths = (
-        [32 * mm, 12 * mm]
-        + [variable_width] * len(income_types)
-        + [12 * mm]
+    remaining_width = (
+        page_width
+        - name_width
+        - year_width
+        - total_width
+    )
+
+    category_width = (
+        remaining_width / max(len(income_types), 1)
     )
 
     story.append(
         create_table(
             income_rows,
-            widths=income_widths,
-            font_size=5.2,
+            widths=[
+                name_width,
+                year_width,
+                *(
+                    [category_width]
+                    * len(income_types)
+                ),
+                total_width,
+            ],
+            font_size=5.1,
+            padding=1.7,
         )
     )
 
@@ -522,27 +610,35 @@ def build_pdf(data):
 
     story.extend(
         [
-            Spacer(1, 6 * mm),
+            Spacer(1, 3 * mm),
             Paragraph(
-                f"Los montos corresponden a promedios mensuales de "
-                f"{years_text}. Confirma los periodos y criterios en "
-                f"el instructivo FUAS 2027 definitivo.",
+                f"Los montos corresponden a promedios mensuales "
+                f"de {years_text}. Confirma los periodos y métodos "
+                f"de cálculo en el instructivo FUAS 2027.",
                 note_style,
             ),
-            Spacer(1, 4 * mm),
+            Spacer(1, 2 * mm),
             Paragraph(
-                "<b>IMPORTANTE:</b> este archivo es solamente un "
-                "borrador de apoyo. Debes realizar y finalizar la "
-                "postulación exclusivamente en fuas.cl para obtener "
-                "un comprobante válido.",
+                "<b>IMPORTANTE:</b> este PDF es solamente un "
+                "borrador de apoyo. La postulación y el comprobante "
+                "válido se obtienen exclusivamente en fuas.cl.",
                 warning_style,
+            ),
+            Spacer(1, 2 * mm),
+            Paragraph(
+                "App desarrollada por peqz",
+                note_style,
             ),
         ]
     )
 
-    document.build(story)
+    document.build(
+        story,
+        onFirstPage=draw_page,
+        onLaterPages=draw_page,
+    )
 
-    pdf_bytes = buffer.getvalue()
+    result = buffer.getvalue()
     buffer.close()
 
-    return pdf_bytes
+    return result
