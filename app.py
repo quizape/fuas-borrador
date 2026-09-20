@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide",
 )
 
-INCOME_YEARS = [2025, 2026]
+YEARS = [2025, 2026]
 
 INCOME_TYPES = [
     "Sueldos",
@@ -44,7 +44,7 @@ ACTIVIDADES = [
     "Otra",
 ]
 
-NIVELES_ESTUDIO = [
+NIVELES_FAMILIA = [
     "Sin estudios",
     "Educación básica incompleta",
     "Educación básica completa",
@@ -110,13 +110,6 @@ PUEBLOS = [
     "Otro",
 ]
 
-SALUD = [
-    "No",
-    "Sí, acreditada",
-    "Sí, sin acreditar",
-    "Revisar en el portal oficial",
-]
-
 ESTABLECIMIENTOS = [
     "Municipal / SLEP",
     "Particular subvencionado",
@@ -131,17 +124,17 @@ ESTABLECIMIENTOS = [
 # ESTADO
 # ---------------------------------------------------------
 
-if "student" not in st.session_state:
-    st.session_state.student = None
+DEFAULTS = {
+    "student": None,
+    "family_members": [],
+    "health_records": {},
+    "saved_incomes": [],
+    "pdf_bytes": None,
+}
 
-if "family_members" not in st.session_state:
-    st.session_state.family_members = []
-
-if "saved_incomes" not in st.session_state:
-    st.session_state.saved_incomes = []
-
-if "pdf_bytes" not in st.session_state:
-    st.session_state.pdf_bytes = None
+for key, default in DEFAULTS.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 
 # ---------------------------------------------------------
@@ -152,8 +145,13 @@ def option_index(options, value):
     return options.index(value) if value in options else 0
 
 
+def money(value):
+    return f"${value:,.0f}".replace(",", ".")
+
+
 def student_as_member(student):
     return {
+        "ID": "postulante",
         "RUT": student["cedula"],
         "Nombre completo": student["nombre"],
         "Edad": student["edad"],
@@ -164,22 +162,44 @@ def student_as_member(student):
     }
 
 
-def clear_income_data():
+def current_family():
+    if st.session_state.student is None:
+        return []
+
+    return [
+        student_as_member(st.session_state.student),
+        *st.session_state.family_members,
+    ]
+
+
+def clear_derived_data():
     st.session_state.saved_incomes = []
     st.session_state.pdf_bytes = None
 
-    income_keys = [
+    keys = [
         key
         for key in list(st.session_state.keys())
         if str(key).startswith("income_")
     ]
 
-    for key in income_keys:
+    for key in keys:
         del st.session_state[key]
 
 
-def format_money(value):
-    return f"${value:,.0f}".replace(",", ".")
+def health_record_for(member_id):
+    return st.session_state.health_records.get(
+        member_id,
+        {
+            "condicion_larga_duracion": "No",
+            "discapacidad": "No",
+            "tipo_condicion": "",
+            "duracion": "",
+            "tratamiento_permanente": "No",
+            "gastos_mensuales": "No",
+            "monto_gasto": 0,
+            "observaciones": "",
+        },
+    )
 
 
 # ---------------------------------------------------------
@@ -268,18 +288,7 @@ with st.form(
         ),
     )
 
-    salud = col3.selectbox(
-        "Condición de salud o discapacidad",
-        SALUD,
-        index=option_index(
-            SALUD,
-            saved.get("salud", "No"),
-        ),
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    nivel = col1.selectbox(
+    nivel = col3.selectbox(
         "Nivel de estudio",
         NIVELES_POSTULANTE,
         index=option_index(
@@ -288,7 +297,9 @@ with st.form(
         ),
     )
 
-    actividad = col2.selectbox(
+    col1, col2, col3 = st.columns(3)
+
+    actividad = col1.selectbox(
         "Actividad",
         ACTIVIDADES,
         index=option_index(
@@ -297,31 +308,29 @@ with st.form(
         ),
     )
 
-    correo = col3.text_input(
+    correo = col2.text_input(
         "Correo electrónico *",
         value=saved.get("correo", ""),
     )
 
-    col1, col2 = st.columns(2)
-
-    celular = col1.text_input(
+    celular = col3.text_input(
         "Celular",
         value=saved.get("celular", ""),
     )
 
-    direccion = col2.text_input(
+    col1, col2, col3 = st.columns(3)
+
+    direccion = col1.text_input(
         "Dirección del grupo familiar",
         value=saved.get("direccion", ""),
     )
 
-    col1, col2 = st.columns(2)
-
-    comuna = col1.text_input(
+    comuna = col2.text_input(
         "Comuna",
         value=saved.get("comuna", ""),
     )
 
-    region = col2.selectbox(
+    region = col3.selectbox(
         "Región",
         REGIONES,
         index=option_index(
@@ -334,15 +343,12 @@ with st.form(
 
     col1, col2, col3 = st.columns(3)
 
-    tipo_establecimiento = col1.selectbox(
+    establecimiento = col1.selectbox(
         "Tipo de establecimiento de egreso",
         ESTABLECIMIENTOS,
         index=option_index(
             ESTABLECIMIENTOS,
-            saved.get(
-                "tipo_establecimiento",
-                "Municipal / SLEP",
-            ),
+            saved.get("establecimiento", "Municipal / SLEP"),
         ),
     )
 
@@ -425,7 +431,6 @@ if save_student:
             "estado_civil": estado_civil,
             "nacionalidad": nacionalidad,
             "pueblo": pueblo,
-            "salud": salud,
             "nivel": nivel,
             "actividad": actividad,
             "correo": correo.strip(),
@@ -433,7 +438,7 @@ if save_student:
             "direccion": direccion.strip(),
             "comuna": comuna.strip(),
             "region": region,
-            "tipo_establecimiento": tipo_establecimiento,
+            "establecimiento": establecimiento,
             "nem": float(nem),
             "media_chile": media_chile,
             "institucion": institucion.strip(),
@@ -442,7 +447,7 @@ if save_student:
         }
 
         if st.session_state.student != new_student:
-            clear_income_data()
+            clear_derived_data()
 
         st.session_state.student = new_student
         st.rerun()
@@ -453,9 +458,6 @@ if st.session_state.student is None:
         "Completa y guarda primero los antecedentes del estudiante."
     )
     st.stop()
-
-
-student = st.session_state.student
 
 
 # ---------------------------------------------------------
@@ -469,21 +471,26 @@ st.info(
     "Agrega solamente a las demás personas del grupo familiar."
 )
 
-family = [
-    student_as_member(student),
-    *st.session_state.family_members,
-]
+family = current_family()
 
-family_table = pd.DataFrame(family)
+table_rows = []
 
-family_table.insert(
-    0,
-    "N.º",
-    range(1, len(family_table) + 1),
-)
+for number, member in enumerate(family, start=1):
+    table_rows.append(
+        {
+            "N.º": number,
+            "Nombre completo": member["Nombre completo"],
+            "Cédula de identidad": member["RUT"],
+            "Edad": member["Edad"],
+            "Estado civil": member["Estado civil"],
+            "Parentesco": member["Parentesco"],
+            "Actividad": member["Actividad"],
+            "Nivel de estudios": member["Nivel de estudios"],
+        }
+    )
 
 st.dataframe(
-    family_table,
+    pd.DataFrame(table_rows),
     hide_index=True,
     use_container_width=True,
 )
@@ -539,7 +546,7 @@ with st.form(
 
     member_studies = col4.selectbox(
         "Nivel de estudios",
-        NIVELES_ESTUDIO,
+        NIVELES_FAMILIA,
         key="new_member_studies",
     )
 
@@ -568,8 +575,11 @@ if add_member:
             st.error(error)
 
     else:
+        member_number = len(st.session_state.family_members) + 1
+
         st.session_state.family_members.append(
             {
+                "ID": f"familiar_{member_number}",
                 "RUT": (
                     format_rut(member_cedula)
                     if member_cedula
@@ -584,52 +594,261 @@ if add_member:
             }
         )
 
-        clear_income_data()
+        clear_derived_data()
         st.rerun()
 
 
 if st.session_state.family_members:
-    st.subheader("Eliminar un integrante")
-
     delete_options = {
         (
             f"{index + 2}. "
             f"{member['Nombre completo']} — "
             f"{member['Parentesco']}"
         ): index
-        for index, member
-        in enumerate(st.session_state.family_members)
+        for index, member in enumerate(
+            st.session_state.family_members
+        )
     }
 
-    selected_member = st.selectbox(
-        "Selecciona el integrante",
-        list(delete_options.keys()),
+    selected_delete = st.selectbox(
+        "Eliminar integrante",
+        ["No eliminar"] + list(delete_options.keys()),
     )
 
-    if st.button("Eliminar integrante"):
-        selected_index = delete_options[selected_member]
-        st.session_state.family_members.pop(selected_index)
+    if (
+        selected_delete != "No eliminar"
+        and st.button("Confirmar eliminación")
+    ):
+        index = delete_options[selected_delete]
+        removed = st.session_state.family_members.pop(index)
 
-        clear_income_data()
+        st.session_state.health_records.pop(
+            removed["ID"],
+            None,
+        )
+
+        clear_derived_data()
         st.rerun()
 
 
-family = [
-    student_as_member(student),
-    *st.session_state.family_members,
-]
+# ---------------------------------------------------------
+# 3. SALUD
+# ---------------------------------------------------------
+
+st.header("3. Encuesta de condición de salud")
+
+st.info(
+    "Completa esta sección por cada integrante que tenga una "
+    "condición de salud de larga duración. Verifica luego las "
+    "preguntas exactas en el portal oficial."
+)
+
+family = current_family()
+
+person_options = {
+    (
+        f"{number}. {member['Nombre completo']} — "
+        f"{member['Parentesco']}"
+    ): member
+    for number, member in enumerate(family, start=1)
+}
+
+selected_person_label = st.selectbox(
+    "Persona a evaluar",
+    list(person_options.keys()),
+)
+
+selected_person = person_options[selected_person_label]
+selected_id = selected_person["ID"]
+saved_health = health_record_for(selected_id)
+
+condition = st.radio(
+    "¿Tiene una condición de salud de larga duración?",
+    ["No", "Sí"],
+    index=option_index(
+        ["No", "Sí"],
+        saved_health["condicion_larga_duracion"],
+    ),
+    horizontal=True,
+    key=f"condition_{selected_id}",
+)
+
+disability = st.radio(
+    "¿Tiene discapacidad acreditada?",
+    ["No", "Sí", "En trámite"],
+    index=option_index(
+        ["No", "Sí", "En trámite"],
+        saved_health["discapacidad"],
+    ),
+    horizontal=True,
+    key=f"disability_{selected_id}",
+)
+
+if condition == "Sí":
+    with st.form(
+        f"health_form_{selected_id}",
+        clear_on_submit=False,
+        enter_to_submit=False,
+    ):
+        st.subheader(
+            f"Antecedentes de salud de "
+            f"{selected_person['Nombre completo']}"
+        )
+
+        col1, col2 = st.columns(2)
+
+        tipo_condicion = col1.text_input(
+            "Tipo de condición *",
+            value=saved_health["tipo_condicion"],
+            placeholder="Descripción general",
+        )
+
+        duracion = col2.text_input(
+            "Duración aproximada *",
+            value=saved_health["duracion"],
+            placeholder="Ejemplo: 3 años",
+        )
+
+        col1, col2 = st.columns(2)
+
+        tratamiento = col1.radio(
+            "¿Requiere tratamiento permanente?",
+            ["No", "Sí"],
+            index=option_index(
+                ["No", "Sí"],
+                saved_health["tratamiento_permanente"],
+            ),
+            horizontal=True,
+        )
+
+        gastos = col2.radio(
+            "¿Genera gastos mensuales?",
+            ["No", "Sí"],
+            index=option_index(
+                ["No", "Sí"],
+                saved_health["gastos_mensuales"],
+            ),
+            horizontal=True,
+        )
+
+        monto = st.number_input(
+            "Gasto mensual estimado",
+            min_value=0,
+            value=int(saved_health["monto_gasto"]),
+            step=1000,
+            disabled=(gastos == "No"),
+        )
+
+        observaciones = st.text_area(
+            "Observaciones opcionales",
+            value=saved_health["observaciones"],
+        )
+
+        save_health = st.form_submit_button(
+            "Guardar antecedentes de salud",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if save_health:
+        errors = []
+
+        if not tipo_condicion.strip():
+            errors.append(
+                "Debes indicar el tipo de condición."
+            )
+
+        if not duracion.strip():
+            errors.append(
+                "Debes indicar la duración aproximada."
+            )
+
+        if errors:
+            for error in errors:
+                st.error(error)
+
+        else:
+            st.session_state.health_records[selected_id] = {
+                "persona": selected_person["Nombre completo"],
+                "parentesco": selected_person["Parentesco"],
+                "condicion_larga_duracion": "Sí",
+                "discapacidad": disability,
+                "tipo_condicion": tipo_condicion.strip(),
+                "duracion": duracion.strip(),
+                "tratamiento_permanente": tratamiento,
+                "gastos_mensuales": gastos,
+                "monto_gasto": int(monto) if gastos == "Sí" else 0,
+                "observaciones": observaciones.strip(),
+            }
+
+            st.session_state.pdf_bytes = None
+            st.success(
+                "Antecedentes de salud guardados."
+            )
+
+else:
+    if st.button(
+        "Guardar respuesta de salud",
+        use_container_width=True,
+    ):
+        st.session_state.health_records[selected_id] = {
+            "persona": selected_person["Nombre completo"],
+            "parentesco": selected_person["Parentesco"],
+            "condicion_larga_duracion": "No",
+            "discapacidad": disability,
+            "tipo_condicion": "",
+            "duracion": "",
+            "tratamiento_permanente": "No",
+            "gastos_mensuales": "No",
+            "monto_gasto": 0,
+            "observaciones": "",
+        }
+
+        st.session_state.pdf_bytes = None
+        st.success("Respuesta de salud guardada.")
+
+
+health_summary = []
+
+for member in family:
+    record = st.session_state.health_records.get(member["ID"])
+
+    health_summary.append(
+        {
+            "Persona": member["Nombre completo"],
+            "Parentesco": member["Parentesco"],
+            "Condición de larga duración": (
+                record["condicion_larga_duracion"]
+                if record
+                else "Sin responder"
+            ),
+            "Discapacidad acreditada": (
+                record["discapacidad"]
+                if record
+                else "Sin responder"
+            ),
+        }
+    )
+
+st.dataframe(
+    pd.DataFrame(health_summary),
+    hide_index=True,
+    use_container_width=True,
+)
 
 
 # ---------------------------------------------------------
-# 3. INGRESOS
+# 4. INGRESOS
 # ---------------------------------------------------------
 
-st.header("3. Ingresos del grupo familiar")
+st.header("4. Ingresos del grupo familiar")
 
 st.info(
     "**El postulante aparece automáticamente en primer lugar.** "
     "Ingresa el promedio mensual correspondiente a cada año."
 )
+
+family = current_family()
 
 with st.form(
     "income_form",
@@ -639,21 +858,21 @@ with st.form(
     income_rows = []
 
     for member_index, member in enumerate(family):
-        member_name = member["Nombre completo"]
-        relation = member["Parentesco"]
+        name = member["Nombre completo"]
 
         with st.expander(
-            f"{member_index + 1}. {member_name} — {relation}",
+            f"{member_index + 1}. {name} — "
+            f"{member['Parentesco']}",
             expanded=(member_index == 0),
         ):
-            for year in INCOME_YEARS:
+            for year in YEARS:
                 st.subheader(f"Promedio mensual {year}")
 
                 saved_row = next(
                     (
                         row
                         for row in st.session_state.saved_incomes
-                        if row["Nombre"] == member_name
+                        if row["ID"] == member["ID"]
                         and row["Año"] == year
                     ),
                     {},
@@ -662,11 +881,9 @@ with st.form(
                 columns = st.columns(3)
                 values = {}
 
-                for income_index, income_type in enumerate(
-                    INCOME_TYPES
-                ):
+                for index, income_type in enumerate(INCOME_TYPES):
                     values[income_type] = columns[
-                        income_index % 3
+                        index % 3
                     ].number_input(
                         income_type,
                         min_value=0,
@@ -675,8 +892,8 @@ with st.form(
                         ),
                         step=1000,
                         key=(
-                            f"income_{member_index}_"
-                            f"{year}_{income_index}"
+                            f"income_{member['ID']}_"
+                            f"{year}_{index}"
                         ),
                     )
 
@@ -684,12 +901,13 @@ with st.form(
 
                 st.metric(
                     f"Total mensual {year}",
-                    format_money(total),
+                    money(total),
                 )
 
                 income_rows.append(
                     {
-                        "Nombre": member_name,
+                        "ID": member["ID"],
+                        "Nombre": name,
                         "Año": year,
                         **values,
                         "Total": total,
@@ -706,15 +924,14 @@ with st.form(
 if save_incomes:
     st.session_state.saved_incomes = income_rows
     st.session_state.pdf_bytes = None
-
     st.success("Ingresos guardados correctamente.")
 
 
 # ---------------------------------------------------------
-# 4. PDF
+# 5. PDF
 # ---------------------------------------------------------
 
-st.header("4. Revisión y descarga")
+st.header("5. Revisión y descarga")
 
 if not st.session_state.saved_incomes:
     st.warning(
@@ -737,27 +954,27 @@ else:
     col1, col2, col3 = st.columns(3)
 
     col1.metric("Integrantes", len(family))
-    col2.metric("Ingreso mensual 2025", format_money(total_2025))
-    col3.metric("Ingreso mensual 2026", format_money(total_2026))
+    col2.metric("Ingreso mensual 2025", money(total_2025))
+    col3.metric("Ingreso mensual 2026", money(total_2026))
 
     accepted = st.checkbox(
         "Confirmo que revisaré estos antecedentes y los validaré "
         "en el portal oficial."
     )
 
-    prepare_pdf = st.button(
+    if st.button(
         "Preparar PDF",
         type="primary",
         use_container_width=True,
-    )
-
-    if prepare_pdf:
+    ):
         if not accepted:
             st.error(
                 "Debes confirmar la revisión antes de generar el PDF."
             )
 
         else:
+            student = st.session_state.student
+
             pdf_data = {
                 "postulante": {
                     "nombre": student["nombre"],
@@ -765,7 +982,7 @@ else:
                     "estado_civil": student["estado_civil"],
                     "nacionalidad": student["nacionalidad"],
                     "pueblo": student["pueblo"],
-                    "salud": student["salud"],
+                    "salud": "Ver encuesta de salud",
                     "nivel": student["nivel"],
                     "actividad": student["actividad"],
                     "correo": student["correo"],
@@ -775,9 +992,7 @@ else:
                     "region": student["region"],
                 },
                 "academicos": {
-                    "tipo_establecimiento": (
-                        student["tipo_establecimiento"]
-                    ),
+                    "tipo_establecimiento": student["establecimiento"],
                     "nem": student["nem"],
                     "media_chile": student["media_chile"],
                     "institucion": student["institucion"],
@@ -789,9 +1004,12 @@ else:
                     "cuenta_ahorro": student["cuenta_ahorro"],
                 },
                 "familia": family,
+                "salud": list(
+                    st.session_state.health_records.values()
+                ),
                 "ingresos": st.session_state.saved_incomes,
                 "income_types": INCOME_TYPES,
-                "years": INCOME_YEARS,
+                "years": YEARS,
             }
 
             st.session_state.pdf_bytes = build_pdf(pdf_data)
