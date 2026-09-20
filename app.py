@@ -124,17 +124,23 @@ ESTABLECIMIENTOS = [
 # ESTADO
 # ---------------------------------------------------------
 
-DEFAULTS = {
-    "student": None,
-    "family_members": [],
-    "health_records": {},
-    "saved_incomes": [],
-    "pdf_bytes": None,
-}
+if "student" not in st.session_state:
+    st.session_state.student = None
 
-for key, default in DEFAULTS.items():
-    if key not in st.session_state:
-        st.session_state[key] = default
+if "family_members" not in st.session_state:
+    st.session_state.family_members = []
+
+if "health_records" not in st.session_state:
+    st.session_state.health_records = {}
+
+if "saved_incomes" not in st.session_state:
+    st.session_state.saved_incomes = []
+
+if "pdf_bytes" not in st.session_state:
+    st.session_state.pdf_bytes = None
+
+if "next_member_id" not in st.session_state:
+    st.session_state.next_member_id = 1
 
 
 # ---------------------------------------------------------
@@ -147,6 +153,11 @@ def option_index(options, value):
 
 def money(value):
     return f"${value:,.0f}".replace(",", ".")
+
+
+def footer():
+    st.divider()
+    st.caption("App desarrollada por peqz")
 
 
 def student_as_member(student):
@@ -176,37 +187,32 @@ def clear_derived_data():
     st.session_state.saved_incomes = []
     st.session_state.pdf_bytes = None
 
-    keys = [
-        key
-        for key in list(st.session_state.keys())
-        if str(key).startswith("income_")
-    ]
-
-    for key in keys:
-        del st.session_state[key]
+    for key in list(st.session_state.keys()):
+        if str(key).startswith("income_"):
+            del st.session_state[key]
 
 
-def health_record_for(member_id):
-    return st.session_state.health_records.get(
-        member_id,
-        {
-            "condicion_larga_duracion": "No",
-            "discapacidad": "No",
-            "tipo_condicion": "",
-            "duracion": "",
-            "tratamiento_permanente": "No",
-            "gastos_mensuales": "No",
-            "monto_gasto": 0,
-            "observaciones": "",
-        },
-    )
+def default_health_record():
+    return {
+        "condicion_larga_duracion": "No",
+        "discapacidad": "No",
+        "tipo_condicion": "",
+        "duracion": "",
+        "tratamiento_permanente": "No",
+        "gastos_mensuales": "No",
+        "monto_gasto": 0,
+        "observaciones": "",
+    }
 
 
 # ---------------------------------------------------------
-# ENCABEZADO
+# ENCABEZADO Y DESCARGO
 # ---------------------------------------------------------
 
-st.title("🎓 Borrador FUAS 2027")
+st.title(
+    "🎓 Borrador FUAS 2027 — "
+    "Uso exclusivo Colegio Superior del Maipo"
+)
 
 st.write(
     "Organiza tus antecedentes antes de completar "
@@ -214,10 +220,25 @@ st.write(
 )
 
 st.warning(
-    "**DOCUMENTO NO OFICIAL:** esta herramienta no realiza una "
-    "postulación, no reemplaza a fuas.cl y no genera un "
-    "comprobante del Ministerio de Educación."
+    "### Descargo de responsabilidad\n\n"
+    "Esta aplicación es una herramienta informativa y de apoyo. "
+    "No realiza una postulación oficial, no representa al "
+    "Ministerio de Educación y no reemplaza el proceso disponible "
+    "en fuas.cl."
 )
+
+accepted_terms = st.checkbox(
+    "Entiendo y acepto que esta herramienta no realiza una "
+    "postulación, no reemplaza a fuas.cl y no genera un "
+    "comprobante del Ministerio de Educación.",
+    key="accepted_terms",
+)
+
+if not accepted_terms:
+    st.info(
+        "El formulario se muestra a continuación, pero permanecerá "
+        "bloqueado hasta aceptar el descargo de responsabilidad."
+    )
 
 st.info(
     "**Privacidad:** los datos permanecen solamente durante esta "
@@ -243,12 +264,14 @@ with st.form(
     nombre = col1.text_input(
         "Nombre completo *",
         value=saved.get("nombre", ""),
+        disabled=not accepted_terms,
     )
 
     cedula = col2.text_input(
         "Cédula de identidad *",
         value=saved.get("cedula", ""),
         placeholder="12.345.678-5",
+        disabled=not accepted_terms,
     )
 
     edad = col3.number_input(
@@ -257,6 +280,7 @@ with st.form(
         max_value=120,
         value=int(saved.get("edad", 18)),
         step=1,
+        disabled=not accepted_terms,
     )
 
     estado_civil = col4.selectbox(
@@ -266,6 +290,7 @@ with st.form(
             ESTADOS_CIVILES,
             saved.get("estado_civil", "Soltero/a"),
         ),
+        disabled=not accepted_terms,
     )
 
     col1, col2, col3 = st.columns(3)
@@ -277,6 +302,7 @@ with st.form(
             ["Chilena", "Extranjera"],
             saved.get("nacionalidad", "Chilena"),
         ),
+        disabled=not accepted_terms,
     )
 
     pueblo = col2.selectbox(
@@ -286,6 +312,7 @@ with st.form(
             PUEBLOS,
             saved.get("pueblo", "No pertenece"),
         ),
+        disabled=not accepted_terms,
     )
 
     nivel = col3.selectbox(
@@ -295,6 +322,7 @@ with st.form(
             NIVELES_POSTULANTE,
             saved.get("nivel", "4° medio"),
         ),
+        disabled=not accepted_terms,
     )
 
     col1, col2, col3 = st.columns(3)
@@ -306,16 +334,19 @@ with st.form(
             ACTIVIDADES,
             saved.get("actividad", "Estudiante"),
         ),
+        disabled=not accepted_terms,
     )
 
     correo = col2.text_input(
         "Correo electrónico *",
         value=saved.get("correo", ""),
+        disabled=not accepted_terms,
     )
 
     celular = col3.text_input(
         "Celular",
         value=saved.get("celular", ""),
+        disabled=not accepted_terms,
     )
 
     col1, col2, col3 = st.columns(3)
@@ -323,11 +354,13 @@ with st.form(
     direccion = col1.text_input(
         "Dirección del grupo familiar",
         value=saved.get("direccion", ""),
+        disabled=not accepted_terms,
     )
 
     comuna = col2.text_input(
         "Comuna",
         value=saved.get("comuna", ""),
+        disabled=not accepted_terms,
     )
 
     region = col3.selectbox(
@@ -337,6 +370,7 @@ with st.form(
             REGIONES,
             saved.get("region", "Metropolitana"),
         ),
+        disabled=not accepted_terms,
     )
 
     st.subheader("Antecedentes académicos")
@@ -350,6 +384,7 @@ with st.form(
             ESTABLECIMIENTOS,
             saved.get("establecimiento", "Municipal / SLEP"),
         ),
+        disabled=not accepted_terms,
     )
 
     nem = col2.number_input(
@@ -358,6 +393,7 @@ with st.form(
         max_value=7.0,
         value=float(saved.get("nem", 5.0)),
         step=0.1,
+        disabled=not accepted_terms,
     )
 
     media_chile = col3.radio(
@@ -368,6 +404,7 @@ with st.form(
             saved.get("media_chile", "Sí"),
         ),
         horizontal=True,
+        disabled=not accepted_terms,
     )
 
     col1, col2, col3 = st.columns(3)
@@ -375,6 +412,7 @@ with st.form(
     institucion = col1.text_input(
         "Institución de educación superior",
         value=saved.get("institucion", ""),
+        disabled=not accepted_terms,
     )
 
     ultimo_ano = col2.number_input(
@@ -384,6 +422,7 @@ with st.form(
         value=int(saved.get("ultimo_ano", 0)),
         step=1,
         help="Usa 0 si no corresponde.",
+        disabled=not accepted_terms,
     )
 
     cuenta_ahorro = col3.radio(
@@ -394,13 +433,20 @@ with st.form(
             saved.get("cuenta_ahorro", "No"),
         ),
         horizontal=True,
+        disabled=not accepted_terms,
     )
 
     save_student = st.form_submit_button(
         "Guardar estudiante y continuar",
         type="primary",
         use_container_width=True,
+        disabled=not accepted_terms,
     )
+
+
+if not accepted_terms:
+    footer()
+    st.stop()
 
 
 if save_student:
@@ -457,6 +503,7 @@ if st.session_state.student is None:
     st.info(
         "Completa y guarda primero los antecedentes del estudiante."
     )
+    footer()
     st.stop()
 
 
@@ -575,11 +622,15 @@ if add_member:
             st.error(error)
 
     else:
-        member_number = len(st.session_state.family_members) + 1
+        member_id = (
+            f"familiar_{st.session_state.next_member_id}"
+        )
+
+        st.session_state.next_member_id += 1
 
         st.session_state.family_members.append(
             {
-                "ID": f"familiar_{member_number}",
+                "ID": member_id,
                 "RUT": (
                     format_rut(member_cedula)
                     if member_cedula
@@ -639,8 +690,8 @@ st.header("3. Encuesta de condición de salud")
 
 st.info(
     "Completa esta sección por cada integrante que tenga una "
-    "condición de salud de larga duración. Verifica luego las "
-    "preguntas exactas en el portal oficial."
+    "condición de salud de larga duración. Verifica posteriormente "
+    "las preguntas exactas en el portal oficial."
 )
 
 family = current_family()
@@ -653,14 +704,18 @@ person_options = {
     for number, member in enumerate(family, start=1)
 }
 
-selected_person_label = st.selectbox(
+selected_label = st.selectbox(
     "Persona a evaluar",
     list(person_options.keys()),
 )
 
-selected_person = person_options[selected_person_label]
+selected_person = person_options[selected_label]
 selected_id = selected_person["ID"]
-saved_health = health_record_for(selected_id)
+
+saved_health = st.session_state.health_records.get(
+    selected_id,
+    default_health_record(),
+)
 
 condition = st.radio(
     "¿Tiene una condición de salud de larga duración?",
@@ -690,23 +745,16 @@ if condition == "Sí":
         clear_on_submit=False,
         enter_to_submit=False,
     ):
-        st.subheader(
-            f"Antecedentes de salud de "
-            f"{selected_person['Nombre completo']}"
-        )
-
         col1, col2 = st.columns(2)
 
         tipo_condicion = col1.text_input(
             "Tipo de condición *",
             value=saved_health["tipo_condicion"],
-            placeholder="Descripción general",
         )
 
         duracion = col2.text_input(
             "Duración aproximada *",
             value=saved_health["duracion"],
-            placeholder="Ejemplo: 3 años",
         )
 
         col1, col2 = st.columns(2)
@@ -751,21 +799,10 @@ if condition == "Sí":
         )
 
     if save_health:
-        errors = []
-
-        if not tipo_condicion.strip():
-            errors.append(
-                "Debes indicar el tipo de condición."
+        if not tipo_condicion.strip() or not duracion.strip():
+            st.error(
+                "Debes indicar el tipo y la duración de la condición."
             )
-
-        if not duracion.strip():
-            errors.append(
-                "Debes indicar la duración aproximada."
-            )
-
-        if errors:
-            for error in errors:
-                st.error(error)
 
         else:
             st.session_state.health_records[selected_id] = {
@@ -777,14 +814,14 @@ if condition == "Sí":
                 "duracion": duracion.strip(),
                 "tratamiento_permanente": tratamiento,
                 "gastos_mensuales": gastos,
-                "monto_gasto": int(monto) if gastos == "Sí" else 0,
+                "monto_gasto": (
+                    int(monto) if gastos == "Sí" else 0
+                ),
                 "observaciones": observaciones.strip(),
             }
 
             st.session_state.pdf_bytes = None
-            st.success(
-                "Antecedentes de salud guardados."
-            )
+            st.success("Antecedentes de salud guardados.")
 
 else:
     if st.button(
@@ -808,35 +845,6 @@ else:
         st.success("Respuesta de salud guardada.")
 
 
-health_summary = []
-
-for member in family:
-    record = st.session_state.health_records.get(member["ID"])
-
-    health_summary.append(
-        {
-            "Persona": member["Nombre completo"],
-            "Parentesco": member["Parentesco"],
-            "Condición de larga duración": (
-                record["condicion_larga_duracion"]
-                if record
-                else "Sin responder"
-            ),
-            "Discapacidad acreditada": (
-                record["discapacidad"]
-                if record
-                else "Sin responder"
-            ),
-        }
-    )
-
-st.dataframe(
-    pd.DataFrame(health_summary),
-    hide_index=True,
-    use_container_width=True,
-)
-
-
 # ---------------------------------------------------------
 # 4. INGRESOS
 # ---------------------------------------------------------
@@ -858,10 +866,9 @@ with st.form(
     income_rows = []
 
     for member_index, member in enumerate(family):
-        name = member["Nombre completo"]
-
         with st.expander(
-            f"{member_index + 1}. {name} — "
+            f"{member_index + 1}. "
+            f"{member['Nombre completo']} — "
             f"{member['Parentesco']}",
             expanded=(member_index == 0),
         ):
@@ -907,7 +914,7 @@ with st.form(
                 income_rows.append(
                     {
                         "ID": member["ID"],
-                        "Nombre": name,
+                        "Nombre": member["Nombre completo"],
                         "Año": year,
                         **values,
                         "Total": total,
@@ -957,7 +964,7 @@ else:
     col2.metric("Ingreso mensual 2025", money(total_2025))
     col3.metric("Ingreso mensual 2026", money(total_2026))
 
-    accepted = st.checkbox(
+    accepted_review = st.checkbox(
         "Confirmo que revisaré estos antecedentes y los validaré "
         "en el portal oficial."
     )
@@ -967,7 +974,7 @@ else:
         type="primary",
         use_container_width=True,
     ):
-        if not accepted:
+        if not accepted_review:
             st.error(
                 "Debes confirmar la revisión antes de generar el PDF."
             )
@@ -982,7 +989,6 @@ else:
                     "estado_civil": student["estado_civil"],
                     "nacionalidad": student["nacionalidad"],
                     "pueblo": student["pueblo"],
-                    "salud": "Ver encuesta de salud",
                     "nivel": student["nivel"],
                     "actividad": student["actividad"],
                     "correo": student["correo"],
@@ -992,7 +998,9 @@ else:
                     "region": student["region"],
                 },
                 "academicos": {
-                    "tipo_establecimiento": student["establecimiento"],
+                    "tipo_establecimiento": student[
+                        "establecimiento"
+                    ],
                     "nem": student["nem"],
                     "media_chile": student["media_chile"],
                     "institucion": student["institucion"],
@@ -1031,3 +1039,670 @@ st.warning(
     "La postulación y el comprobante válido se obtienen "
     "exclusivamente en fuas.cl."
 )
+
+footer()
+Después pulsa Commit changes. Streamlit debería actualizarse automáticamente en uno o dos minutos.
+
+
+Sources
+
+
+
+You said:
+ah, otra cosa. COnfigurar la impresión, pues queda una página, unpoco de otra pagina y una tercera pagina, cabe todo en dos hojas
+Copilot said:
+Copilot
+Sí. El ajuste debe hacerse en pdf_generator.py, no en app.py.
+
+Reemplaza todo pdf_generator.py con esta versión. Está diseñada para:
+
+A4 horizontal.
+Márgenes más pequeños.
+Primera página: postulante, antecedentes académicos, familia y salud.
+Segunda página: ingresos.
+Tipografía y espacios compactos.
+Numeración de páginas.
+from html import escape
+from io import BytesIO
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
+
+BLUE = colors.HexColor("#0B5CAD")
+LIGHT_BLUE = colors.HexColor("#EAF2F8")
+GRAY = colors.HexColor("#5E6D78")
+DARK = colors.HexColor("#172B3A")
+YELLOW = colors.HexColor("#FFF4CC")
+
+
+def safe_text(value):
+    if value in (None, ""):
+        return "—"
+
+    return escape(str(value))
+
+
+def money(value):
+    try:
+        return f"${float(value):,.0f}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "$0"
+
+
+def create_table(
+    rows,
+    widths=None,
+    font_size=6.5,
+    header_rows=1,
+    padding=2.5,
+):
+    table = Table(
+        rows,
+        colWidths=widths,
+        repeatRows=header_rows,
+        hAlign="LEFT",
+    )
+
+    style = [
+        (
+            "BACKGROUND",
+            (0, 0),
+            (-1, header_rows - 1),
+            BLUE,
+        ),
+        (
+            "TEXTCOLOR",
+            (0, 0),
+            (-1, header_rows - 1),
+            colors.white,
+        ),
+        (
+            "FONTNAME",
+            (0, 0),
+            (-1, header_rows - 1),
+            "Helvetica-Bold",
+        ),
+        (
+            "TEXTCOLOR",
+            (0, header_rows),
+            (-1, -1),
+            DARK,
+        ),
+        (
+            "FONTSIZE",
+            (0, 0),
+            (-1, -1),
+            font_size,
+        ),
+        (
+            "LEADING",
+            (0, 0),
+            (-1, -1),
+            font_size + 1.2,
+        ),
+        (
+            "GRID",
+            (0, 0),
+            (-1, -1),
+            0.3,
+            colors.HexColor("#AAB7C2"),
+        ),
+        (
+            "VALIGN",
+            (0, 0),
+            (-1, -1),
+            "MIDDLE",
+        ),
+        (
+            "ROWBACKGROUNDS",
+            (0, header_rows),
+            (-1, -1),
+            [colors.white, LIGHT_BLUE],
+        ),
+        (
+            "LEFTPADDING",
+            (0, 0),
+            (-1, -1),
+            padding,
+        ),
+        (
+            "RIGHTPADDING",
+            (0, 0),
+            (-1, -1),
+            padding,
+        ),
+        (
+            "TOPPADDING",
+            (0, 0),
+            (-1, -1),
+            padding,
+        ),
+        (
+            "BOTTOMPADDING",
+            (0, 0),
+            (-1, -1),
+            padding,
+        ),
+    ]
+
+    table.setStyle(TableStyle(style))
+
+    return table
+
+
+def draw_page(canvas, document):
+    canvas.saveState()
+
+    page_width, _ = landscape(A4)
+
+    canvas.setStrokeColor(colors.HexColor("#C7D2DC"))
+    canvas.setLineWidth(0.4)
+
+    canvas.line(
+        8 * mm,
+        7 * mm,
+        page_width - 8 * mm,
+        7 * mm,
+    )
+
+    canvas.setFont("Helvetica", 6.5)
+    canvas.setFillColor(GRAY)
+
+    canvas.drawString(
+        8 * mm,
+        3.8 * mm,
+        "Borrador FUAS 2027 — Colegio Superior del Maipo",
+    )
+
+    canvas.drawRightString(
+        page_width - 8 * mm,
+        3.8 * mm,
+        f"Página {document.page}",
+    )
+
+    canvas.restoreState()
+
+
+def build_pdf(data):
+    buffer = BytesIO()
+
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=8 * mm,
+        leftMargin=8 * mm,
+        topMargin=7 * mm,
+        bottomMargin=10 * mm,
+        title="Borrador FUAS 2027",
+        author="peqz",
+        allowSplitting=1,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "TitleCompact",
+        parent=styles["Title"],
+        textColor=BLUE,
+        fontSize=14,
+        leading=16,
+        spaceAfter=2,
+    )
+
+    subtitle_style = ParagraphStyle(
+        "SubtitleCompact",
+        parent=styles["Normal"],
+        textColor=DARK,
+        fontSize=7.5,
+        leading=9,
+        alignment=1,
+        spaceAfter=3,
+    )
+
+    section_style = ParagraphStyle(
+        "SectionCompact",
+        parent=styles["Heading2"],
+        textColor=BLUE,
+        fontSize=9,
+        leading=10,
+        spaceBefore=3,
+        spaceAfter=2,
+    )
+
+    note_style = ParagraphStyle(
+        "NoteCompact",
+        parent=styles["Normal"],
+        textColor=GRAY,
+        fontSize=6.5,
+        leading=8,
+        spaceAfter=2,
+    )
+
+    warning_style = ParagraphStyle(
+        "WarningCompact",
+        parent=styles["Normal"],
+        textColor=colors.HexColor("#6A4300"),
+        backColor=YELLOW,
+        borderColor=colors.HexColor("#E3A008"),
+        borderWidth=0.6,
+        borderPadding=4,
+        fontSize=7,
+        leading=8.5,
+        spaceBefore=2,
+        spaceAfter=3,
+    )
+
+    story = [
+        Paragraph(
+            "BORRADOR FUAS 2027",
+            title_style,
+        ),
+        Paragraph(
+            "Uso exclusivo Colegio Superior del Maipo",
+            subtitle_style,
+        ),
+        Paragraph(
+            "<b>DESCARGO DE RESPONSABILIDAD:</b> esta herramienta "
+            "no realiza una postulación, no reemplaza a fuas.cl y "
+            "no genera un comprobante del Ministerio de Educación.",
+            warning_style,
+        ),
+    ]
+
+    # =====================================================
+    # PÁGINA 1
+    # =====================================================
+
+    postulante = data.get("postulante", {})
+
+    story.append(
+        Paragraph(
+            "1. Antecedentes de la persona postulante",
+            section_style,
+        )
+    )
+
+    personal_rows = [
+        [
+            "Nombre completo",
+            "Cédula de identidad",
+            "Estado civil",
+            "Nacionalidad",
+        ],
+        [
+            safe_text(postulante.get("nombre")),
+            safe_text(postulante.get("rut")),
+            safe_text(postulante.get("estado_civil")),
+            safe_text(postulante.get("nacionalidad")),
+        ],
+        [
+            "Pueblo originario",
+            "Nivel de estudio",
+            "Actividad",
+            "Correo electrónico",
+        ],
+        [
+            safe_text(postulante.get("pueblo")),
+            safe_text(postulante.get("nivel")),
+            safe_text(postulante.get("actividad")),
+            safe_text(postulante.get("correo")),
+        ],
+        [
+            "Celular",
+            "Dirección",
+            "Comuna",
+            "Región",
+        ],
+        [
+            safe_text(postulante.get("celular")),
+            safe_text(postulante.get("direccion")),
+            safe_text(postulante.get("comuna")),
+            safe_text(postulante.get("region")),
+        ],
+    ]
+
+    story.append(
+        create_table(
+            personal_rows,
+            widths=[
+                70 * mm,
+                68 * mm,
+                68 * mm,
+                70 * mm,
+            ],
+            font_size=6.7,
+        )
+    )
+
+    academicos = data.get("academicos", {})
+
+    story.append(
+        Paragraph(
+            "2. Antecedentes académicos",
+            section_style,
+        )
+    )
+
+    academic_rows = [
+        [
+            "Establecimiento de egreso",
+            "Promedio NEM",
+            "Enseñanza media en Chile",
+        ],
+        [
+            safe_text(
+                academicos.get("tipo_establecimiento")
+            ),
+            safe_text(academicos.get("nem")),
+            safe_text(academicos.get("media_chile")),
+        ],
+        [
+            "Institución de educación superior",
+            "Último año de matrícula",
+            "Cuenta de ahorro para educación",
+        ],
+        [
+            safe_text(academicos.get("institucion")),
+            safe_text(academicos.get("ultimo_ano")),
+            safe_text(academicos.get("cuenta_ahorro")),
+        ],
+    ]
+
+    story.append(
+        create_table(
+            academic_rows,
+            widths=[
+                92 * mm,
+                92 * mm,
+                92 * mm,
+            ],
+            font_size=6.7,
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "3. Integrantes del grupo familiar",
+            section_style,
+        )
+    )
+
+    family_rows = [
+        [
+            "N.º",
+            "Cédula",
+            "Nombre completo",
+            "Edad",
+            "Estado civil",
+            "Parentesco",
+            "Actividad",
+            "Nivel de estudios",
+        ]
+    ]
+
+    for number, member in enumerate(
+        data.get("familia", []),
+        start=1,
+    ):
+        family_rows.append(
+            [
+                number,
+                safe_text(member.get("RUT")),
+                safe_text(member.get("Nombre completo")),
+                safe_text(member.get("Edad")),
+                safe_text(member.get("Estado civil")),
+                safe_text(member.get("Parentesco")),
+                safe_text(member.get("Actividad")),
+                safe_text(member.get("Nivel de estudios")),
+            ]
+        )
+
+    if len(family_rows) == 1:
+        family_rows.append(["—"] * 8)
+
+    story.append(
+        create_table(
+            family_rows,
+            widths=[
+                9 * mm,
+                27 * mm,
+                46 * mm,
+                12 * mm,
+                29 * mm,
+                31 * mm,
+                48 * mm,
+                74 * mm,
+            ],
+            font_size=5.8,
+            padding=2,
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "4. Antecedentes de salud",
+            section_style,
+        )
+    )
+
+    health_records = data.get("salud", [])
+
+    health_rows = [
+        [
+            "Persona",
+            "Parentesco",
+            "Condición prolongada",
+            "Discapacidad",
+            "Condición / duración",
+            "Tratamiento",
+            "Gasto mensual",
+            "Observaciones",
+        ]
+    ]
+
+    for record in health_records:
+        condition_detail = "—"
+
+        if (
+            record.get("tipo_condicion")
+            or record.get("duracion")
+        ):
+            condition_detail = (
+                f"{safe_text(record.get('tipo_condicion'))} / "
+                f"{safe_text(record.get('duracion'))}"
+            )
+
+        gasto = "No"
+
+        if record.get("gastos_mensuales") == "Sí":
+            gasto = money(record.get("monto_gasto", 0))
+
+        health_rows.append(
+            [
+                safe_text(record.get("persona")),
+                safe_text(record.get("parentesco")),
+                safe_text(
+                    record.get("condicion_larga_duracion")
+                ),
+                safe_text(record.get("discapacidad")),
+                condition_detail,
+                safe_text(
+                    record.get("tratamiento_permanente")
+                ),
+                gasto,
+                safe_text(record.get("observaciones")),
+            ]
+        )
+
+    if len(health_rows) == 1:
+        health_rows.append(
+            [
+                "Sin antecedentes registrados",
+                "—",
+                "—",
+                "—",
+                "—",
+                "—",
+                "—",
+                "—",
+            ]
+        )
+
+    story.append(
+        create_table(
+            health_rows,
+            widths=[
+                40 * mm,
+                28 * mm,
+                27 * mm,
+                25 * mm,
+                48 * mm,
+                27 * mm,
+                28 * mm,
+                53 * mm,
+            ],
+            font_size=5.7,
+            padding=2,
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "La información de salud es preparatoria. Debe "
+            "confirmarse en el formulario oficial.",
+            note_style,
+        )
+    )
+
+    # =====================================================
+    # PÁGINA 2
+    # =====================================================
+
+    story.append(PageBreak())
+
+    story.append(
+        Paragraph(
+            "5. Promedio mensual de ingresos del grupo familiar",
+            section_style,
+        )
+    )
+
+    income_types = data.get("income_types", [])
+
+    income_rows = [
+        [
+            "Integrante",
+            "Año",
+            *income_types,
+            "Total",
+        ]
+    ]
+
+    for income_row in data.get("ingresos", []):
+        income_rows.append(
+            [
+                safe_text(income_row.get("Nombre")),
+                safe_text(income_row.get("Año")),
+                *[
+                    money(income_row.get(income_type, 0))
+                    for income_type in income_types
+                ],
+                money(income_row.get("Total", 0)),
+            ]
+        )
+
+    if len(income_rows) == 1:
+        income_rows.append(
+            [
+                "Sin ingresos registrados",
+                "—",
+                *(["$0"] * len(income_types)),
+                "$0",
+            ]
+        )
+
+    page_width = 276 * mm
+    name_width = 35 * mm
+    year_width = 12 * mm
+    total_width = 21 * mm
+
+    remaining_width = (
+        page_width
+        - name_width
+        - year_width
+        - total_width
+    )
+
+    category_width = (
+        remaining_width / max(len(income_types), 1)
+    )
+
+    story.append(
+        create_table(
+            income_rows,
+            widths=[
+                name_width,
+                year_width,
+                *(
+                    [category_width]
+                    * len(income_types)
+                ),
+                total_width,
+            ],
+            font_size=5.1,
+            padding=1.7,
+        )
+    )
+
+    years = data.get("years", [])
+
+    if len(years) >= 2:
+        years_text = f"{years[0]} y {years[1]}"
+    else:
+        years_text = "los años solicitados"
+
+    story.extend(
+        [
+            Spacer(1, 3 * mm),
+            Paragraph(
+                f"Los montos corresponden a promedios mensuales "
+                f"de {years_text}. Confirma los periodos y métodos "
+                f"de cálculo en el instructivo FUAS 2027.",
+                note_style,
+            ),
+            Spacer(1, 2 * mm),
+            Paragraph(
+                "<b>IMPORTANTE:</b> este PDF es solamente un "
+                "borrador de apoyo. La postulación y el comprobante "
+                "válido se obtienen exclusivamente en fuas.cl.",
+                warning_style,
+            ),
+            Spacer(1, 2 * mm),
+            Paragraph(
+                "App desarrollada por peqz",
+                note_style,
+            ),
+        ]
+    )
+
+    document.build(
+        story,
+        onFirstPage=draw_page,
+        onLaterPages=draw_page,
+    )
+
+    result = buffer.getvalue()
+    buffer.close()
+
+    return result
