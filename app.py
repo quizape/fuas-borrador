@@ -87,6 +87,10 @@ REGIONES = [
 ]
 
 
+# ---------------------------------------------------------
+# ESTILOS
+# ---------------------------------------------------------
+
 st.markdown(
     """
     <style>
@@ -98,9 +102,14 @@ st.markdown(
     .hero {
         padding: 1.4rem 1.6rem;
         border-radius: 14px;
-        color: white;
+        color: #FFFFFF !important;
         background: linear-gradient(110deg, #063b6f, #0b75c9);
         margin-bottom: 1rem;
+    }
+
+    .hero h1,
+    .hero p {
+        color: #FFFFFF !important;
     }
 
     .hero h1 {
@@ -114,39 +123,59 @@ st.markdown(
     }
 
     .disclaimer {
-    border-left: 6px solid #e3a008;
-    background: #fff8df;
-    color: #172B3A !important;
-    padding: 1rem 1.1rem;
-    border-radius: 7px;
-    margin: 1rem 0;
-    font-size: 1.15rem;
-    font-weight: 700;
-    line-height: 1.5;
-}
+        border-left: 6px solid #E3A008;
+        background-color: #FFF8DF !important;
+        color: #172B3A !important;
+        padding: 1rem 1.1rem;
+        border-radius: 7px;
+        margin: 1rem 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1.5;
+    }
+
+    .family-container {
+        width: 100%;
+        overflow-x: auto;
+        margin: 0.8rem 0 1.2rem;
+    }
 
     .member-table {
         width: 100%;
         border-collapse: collapse;
-        margin: 0.8rem 0 1.2rem;
+        background-color: #FFFFFF !important;
     }
 
     .member-table th {
-        background: #0B5CAD;
-        color: white;
-        padding: 9px;
+        background-color: #0B5CAD !important;
+        color: #FFFFFF !important;
+        padding: 10px;
+        border: 1px solid #0A4D91;
         text-align: left;
         font-size: 0.9rem;
+        white-space: nowrap;
     }
 
     .member-table td {
-        border: 1px solid #c7d2dc;
-        padding: 9px;
+        background-color: #FFFFFF !important;
+        color: #172B3A !important;
+        padding: 10px;
+        border: 1px solid #C7D2DC;
         font-size: 0.9rem;
     }
 
-    .member-table tr:nth-child(even) {
-        background: #eef5fa;
+    .member-table tbody tr:nth-child(even) td {
+        background-color: #EAF2F8 !important;
+        color: #172B3A !important;
+    }
+
+    .member-table tbody tr:nth-child(odd) td {
+        background-color: #FFFFFF !important;
+        color: #172B3A !important;
+    }
+
+    .member-table tbody tr td * {
+        color: #172B3A !important;
     }
 
     [data-testid="stMetricValue"] {
@@ -194,10 +223,28 @@ if "pdf_bytes" not in st.session_state:
     st.session_state.pdf_bytes = None
 
 
+# ---------------------------------------------------------
+# FUNCIONES
+# ---------------------------------------------------------
+
 def option_index(options, selected):
     if selected in options:
         return options.index(selected)
     return 0
+
+
+def clear_income_state():
+    st.session_state.saved_incomes = []
+    st.session_state.pdf_bytes = None
+
+    keys_to_delete = [
+        key
+        for key in st.session_state.keys()
+        if str(key).startswith("income_")
+    ]
+
+    for key in keys_to_delete:
+        del st.session_state[key]
 
 
 def student_as_member(student):
@@ -219,7 +266,7 @@ def show_family_table(members):
         values = [
             position,
             member["Nombre completo"],
-            member["RUT"],
+            member["RUT"] or "—",
             member["Edad"],
             member["Estado civil"],
             member["Parentesco"],
@@ -236,7 +283,7 @@ def show_family_table(members):
 
     st.markdown(
         f"""
-        <div translate="no">
+        <div class="family-container" translate="no">
             <table class="member-table">
                 <thead>
                     <tr>
@@ -494,28 +541,27 @@ with st.form(
 
 
 if save_student:
-    student_errors = []
+    errors = []
 
     if not nombre.strip():
-        student_errors.append("Falta el nombre completo.")
+        errors.append("Falta el nombre completo.")
 
     if not valid_rut(cedula):
-        student_errors.append(
+        errors.append(
             "La cédula de identidad ingresada no es válida."
         )
 
     if "@" not in correo or "." not in correo.split("@")[-1]:
-        student_errors.append(
+        errors.append(
             "El correo electrónico no parece válido."
         )
 
-    if student_errors:
-        for error in student_errors:
+    if errors:
+        for error in errors:
             st.error(error)
-    else:
-        previous_student = st.session_state.student
 
-        st.session_state.student = {
+    else:
+        new_student = {
             "nombre": nombre.strip(),
             "cedula": format_rut(cedula),
             "edad": int(edad),
@@ -538,11 +584,12 @@ if save_student:
             "cuenta_ahorro": cuenta_ahorro,
         }
 
-        if previous_student != st.session_state.student:
-            st.session_state.saved_incomes = []
-            st.session_state.pdf_bytes = None
+        if st.session_state.student != new_student:
+            clear_income_state()
 
+        st.session_state.student = new_student
         st.success("Datos del estudiante guardados correctamente.")
+        st.rerun()
 
 
 if st.session_state.student is None:
@@ -572,7 +619,7 @@ family = [
     *st.session_state.family_members,
 ]
 
-# Aquí siempre se muestra al estudiante en la primera fila.
+# Siempre muestra al postulante como primera fila.
 show_family_table(family)
 
 st.markdown("#### Agregar otro integrante")
@@ -638,21 +685,22 @@ with st.form(
 
 
 if add_member:
-    member_errors = []
+    errors = []
 
     if not member_name.strip():
-        member_errors.append(
+        errors.append(
             "Debes escribir el nombre del integrante."
         )
 
     if member_cedula and not valid_rut(member_cedula):
-        member_errors.append(
+        errors.append(
             "La cédula de identidad del integrante no es válida."
         )
 
-    if member_errors:
-        for error in member_errors:
+    if errors:
+        for error in errors:
             st.error(error)
+
     else:
         st.session_state.family_members.append(
             {
@@ -670,8 +718,7 @@ if add_member:
             }
         )
 
-        st.session_state.saved_incomes = []
-        st.session_state.pdf_bytes = None
+        clear_income_state()
         st.rerun()
 
 
@@ -696,12 +743,10 @@ if st.session_state.family_members:
     if st.button("Eliminar integrante"):
         selected_index = delete_options[selected_member]
         st.session_state.family_members.pop(selected_index)
-        st.session_state.saved_incomes = []
-        st.session_state.pdf_bytes = None
+        clear_income_state()
         st.rerun()
 
 
-# Reconstruir la familia después de agregar o eliminar.
 family = [
     student_as_member(student),
     *st.session_state.family_members,
@@ -768,6 +813,11 @@ with st.form(
 
                 total = sum(values.values())
 
+                st.caption(
+                    f"Total mensual {year}: "
+                    f"${total:,.0f}".replace(",", ".")
+                )
+
                 income_rows.append(
                     {
                         "Nombre": member_name,
@@ -800,6 +850,7 @@ if not st.session_state.saved_incomes:
     st.warning(
         "Guarda primero los ingresos para preparar el PDF."
     )
+
 else:
     total_2025 = sum(
         row["Total"]
@@ -841,6 +892,7 @@ else:
             st.error(
                 "Debes confirmar la revisión antes de generar el PDF."
             )
+
         else:
             pdf_data = {
                 "postulante": {
