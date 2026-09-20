@@ -114,15 +114,16 @@ st.markdown(
     }
 
     .disclaimer {
-        border-left: 6px solid #e3a008;
-        background: #fff8df;
-        padding: 1rem 1.1rem;
-        border-radius: 7px;
-        margin: 1rem 0;
-        font-size: 1.15rem;
-        font-weight: 700;
-        line-height: 1.5;
-    }
+    border-left: 6px solid #e3a008;
+    background: #fff8df;
+    color: #172B3A !important;
+    padding: 1rem 1.1rem;
+    border-radius: 7px;
+    margin: 1rem 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.5;
+}
 
     .member-table {
         width: 100%;
