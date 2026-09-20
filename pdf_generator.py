@@ -1,5 +1,5 @@
-from io import BytesIO
 from html import escape
+from io import BytesIO
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
@@ -14,6 +14,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+
 BLUE = colors.HexColor("#0B5CAD")
 LIGHT_BLUE = colors.HexColor("#EAF2F8")
 GRAY = colors.HexColor("#5E6D78")
@@ -22,6 +23,7 @@ GRAY = colors.HexColor("#5E6D78")
 def safe_text(value):
     if value in (None, ""):
         return "—"
+
     return escape(str(value))
 
 
@@ -34,27 +36,82 @@ def money(value):
 
 
 def create_table(rows, widths=None, font_size=7):
-    table = Table(rows, colWidths=widths, repeatRows=1)
+    table = Table(
+        rows,
+        colWidths=widths,
+        repeatRows=1,
+    )
 
     table.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), BLUE),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), font_size),
-                ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (-1, 0),
+                    BLUE,
+                ),
+                (
+                    "TEXTCOLOR",
+                    (0, 0),
+                    (-1, 0),
+                    colors.white,
+                ),
+                (
+                    "FONTNAME",
+                    (0, 0),
+                    (-1, 0),
+                    "Helvetica-Bold",
+                ),
+                (
+                    "FONTSIZE",
+                    (0, 0),
+                    (-1, -1),
+                    font_size,
+                ),
+                (
+                    "GRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.4,
+                    colors.HexColor("#AAB7C2"),
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "TOP",
+                ),
                 (
                     "ROWBACKGROUNDS",
                     (0, 1),
                     (-1, -1),
                     [colors.white, LIGHT_BLUE],
                 ),
-                ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                (
+                    "LEFTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4,
+                ),
+                (
+                    "RIGHTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4,
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4,
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4,
+                ),
             ]
         )
     )
@@ -73,6 +130,7 @@ def build_pdf(data):
         topMargin=12 * mm,
         bottomMargin=12 * mm,
         title="Borrador de antecedentes FUAS",
+        author="Aplicación Borrador FUAS",
     )
 
     styles = getSampleStyleSheet()
@@ -89,9 +147,10 @@ def build_pdf(data):
         "FUASSection",
         parent=styles["Heading2"],
         textColor=BLUE,
-        fontSize=11,
-        spaceBefore=8,
-        spaceAfter=5,
+        fontSize=12,
+        leading=15,
+        spaceBefore=9,
+        spaceAfter=6,
     )
 
     note_style = ParagraphStyle(
@@ -102,17 +161,37 @@ def build_pdf(data):
         leading=11,
     )
 
+    warning_style = ParagraphStyle(
+        "FUASWarning",
+        parent=styles["Normal"],
+        textColor=colors.HexColor("#7A4B00"),
+        backColor=colors.HexColor("#FFF4CC"),
+        borderColor=colors.HexColor("#E3A008"),
+        borderWidth=1,
+        borderPadding=8,
+        fontSize=9,
+        leading=12,
+        spaceAfter=8,
+    )
+
     story = [
-        Paragraph("BORRADOR DE ANTECEDENTES FUAS", title_style),
         Paragraph(
-            "DOCUMENTO NO OFICIAL — NO CONSTITUYE POSTULACIÓN "
-            "NI COMPROBANTE DEL MINEDUC",
-            note_style,
+            "BORRADOR DE ANTECEDENTES FUAS",
+            title_style,
         ),
-        Spacer(1, 6 * mm),
+        Paragraph(
+            "<b>DOCUMENTO NO OFICIAL:</b> no constituye una "
+            "postulación ni un comprobante del Ministerio de Educación.",
+            warning_style,
+        ),
+        Spacer(1, 3 * mm),
     ]
 
-    postulante = data["postulante"]
+    # -----------------------------------------------------
+    # 1. POSTULANTE
+    # -----------------------------------------------------
+
+    postulante = data.get("postulante", {})
 
     story.append(
         Paragraph(
@@ -122,32 +201,45 @@ def build_pdf(data):
     )
 
     personal_rows = [
-        ["Nombre completo", "RUT", "Estado civil"],
+        [
+            "Nombre completo",
+            "Cédula de identidad",
+            "Estado civil",
+        ],
         [
             safe_text(postulante.get("nombre")),
             safe_text(postulante.get("rut")),
             safe_text(postulante.get("estado_civil")),
         ],
-        ["Nacionalidad", "Pueblo originario", "Salud o discapacidad"],
+        [
+            "Nacionalidad",
+            "Pueblo originario",
+            "Nivel de estudio",
+        ],
         [
             safe_text(postulante.get("nacionalidad")),
             safe_text(postulante.get("pueblo")),
-            safe_text(postulante.get("salud")),
-        ],
-        ["Nivel de estudio", "Actividad", "Correo electrónico"],
-        [
             safe_text(postulante.get("nivel")),
+        ],
+        [
+            "Actividad",
+            "Correo electrónico",
+            "Celular",
+        ],
+        [
             safe_text(postulante.get("actividad")),
             safe_text(postulante.get("correo")),
-        ],
-        ["Celular", "Dirección", "Comuna y región"],
-        [
             safe_text(postulante.get("celular")),
+        ],
+        [
+            "Dirección",
+            "Comuna",
+            "Región",
+        ],
+        [
             safe_text(postulante.get("direccion")),
-            (
-                f"{safe_text(postulante.get('comuna'))} / "
-                f"{safe_text(postulante.get('region'))}"
-            ),
+            safe_text(postulante.get("comuna")),
+            safe_text(postulante.get("region")),
         ],
     ]
 
@@ -159,9 +251,18 @@ def build_pdf(data):
         )
     )
 
-    academicos = data["academicos"]
+    # -----------------------------------------------------
+    # 2. ANTECEDENTES ACADÉMICOS
+    # -----------------------------------------------------
 
-    story.append(Paragraph("2. Antecedentes académicos", section_style))
+    academicos = data.get("academicos", {})
+
+    story.append(
+        Paragraph(
+            "2. Antecedentes académicos",
+            section_style,
+        )
+    )
 
     academic_rows = [
         [
@@ -170,7 +271,9 @@ def build_pdf(data):
             "Enseñanza media cursada en Chile",
         ],
         [
-            safe_text(academicos.get("tipo_establecimiento")),
+            safe_text(
+                academicos.get("tipo_establecimiento")
+            ),
             safe_text(academicos.get("nem")),
             safe_text(academicos.get("media_chile")),
         ],
@@ -194,11 +297,21 @@ def build_pdf(data):
         )
     )
 
-    story.append(Paragraph("3. Grupo familiar", section_style))
+    # -----------------------------------------------------
+    # 3. GRUPO FAMILIAR
+    # -----------------------------------------------------
+
+    story.append(
+        Paragraph(
+            "3. Integrantes del grupo familiar",
+            section_style,
+        )
+    )
 
     family_rows = [
         [
-            "RUT",
+            "N.º",
+            "Cédula",
             "Nombre completo",
             "Edad",
             "Estado civil",
@@ -208,9 +321,13 @@ def build_pdf(data):
         ]
     ]
 
-    for member in data.get("familia", []):
+    for number, member in enumerate(
+        data.get("familia", []),
+        start=1,
+    ):
         family_rows.append(
             [
+                number,
                 safe_text(member.get("RUT")),
                 safe_text(member.get("Nombre completo")),
                 safe_text(member.get("Edad")),
@@ -222,36 +339,138 @@ def build_pdf(data):
         )
 
     if len(family_rows) == 1:
-        family_rows.append(["—"] * 7)
+        family_rows.append(["—"] * 8)
 
     story.append(
         create_table(
             family_rows,
             widths=[
+                10 * mm,
+                27 * mm,
+                43 * mm,
+                13 * mm,
+                28 * mm,
                 31 * mm,
                 48 * mm,
-                16 * mm,
-                33 * mm,
-                35 * mm,
-                43 * mm,
-                55 * mm,
+                61 * mm,
             ],
-            font_size=7,
+            font_size=6.5,
         )
     )
 
-    story.append(PageBreak())
+    # -----------------------------------------------------
+    # 4. SALUD
+    # -----------------------------------------------------
+
     story.append(
         Paragraph(
-            "4. Promedio mensual de ingresos del grupo familiar",
+            "4. Encuesta preparatoria de condición de salud",
             section_style,
         )
     )
 
-    income_types = data["income_types"]
+    story.append(
+        Paragraph(
+            "Esta sección es únicamente una ayuda para organizar "
+            "antecedentes. Las preguntas y documentos exigidos deben "
+            "confirmarse en el portal oficial.",
+            note_style,
+        )
+    )
 
+    story.append(Spacer(1, 2 * mm))
+
+    health_records = data.get("salud", [])
+
+    health_rows = [
+        [
+            "Persona",
+            "Parentesco",
+            "Condición prolongada",
+            "Discapacidad",
+            "Tipo de condición",
+            "Duración",
+            "Tratamiento",
+            "Gasto mensual",
+            "Observaciones",
+        ]
+    ]
+
+    for record in health_records:
+        gasto = "No"
+
+        if record.get("gastos_mensuales") == "Sí":
+            gasto = money(record.get("monto_gasto", 0))
+
+        health_rows.append(
+            [
+                safe_text(record.get("persona")),
+                safe_text(record.get("parentesco")),
+                safe_text(
+                    record.get("condicion_larga_duracion")
+                ),
+                safe_text(record.get("discapacidad")),
+                safe_text(record.get("tipo_condicion")),
+                safe_text(record.get("duracion")),
+                safe_text(
+                    record.get("tratamiento_permanente")
+                ),
+                gasto,
+                safe_text(record.get("observaciones")),
+            ]
+        )
+
+    if len(health_rows) == 1:
+        health_rows.append(
+            [
+                "Sin respuestas registradas",
+                "—",
+                "—",
+                "—",
+                "—",
+                "—",
+                "—",
+                "—",
+                "—",
+            ]
+        )
+
+    story.append(
+        create_table(
+            health_rows,
+            widths=[
+                35 * mm,
+                25 * mm,
+                25 * mm,
+                22 * mm,
+                35 * mm,
+                22 * mm,
+                23 * mm,
+                25 * mm,
+                49 * mm,
+            ],
+            font_size=6,
+        )
+    )
+
+    # -----------------------------------------------------
+    # 5. INGRESOS
+    # -----------------------------------------------------
+
+    story.append(PageBreak())
+
+    story.append(
+        Paragraph(
+            "5. Promedio mensual de ingresos del grupo familiar",
+            section_style,
+        )
+    )
+
+    income_types = data.get("income_types", [])
     income_rows = [
-        ["Integrante", "Año"] + income_types + ["Total mensual"]
+        ["Integrante", "Año"]
+        + income_types
+        + ["Total mensual"]
     ]
 
     for income_row in data.get("ingresos", []):
@@ -267,37 +486,56 @@ def build_pdf(data):
             + [money(income_row.get("Total", 0))]
         )
 
+    if len(income_rows) == 1:
+        income_rows.append(
+            ["Sin ingresos registrados", "—"]
+            + ["$0"] * len(income_types)
+            + ["$0"]
+        )
+
+    available_width = 273 * mm
+    fixed_width = 56 * mm
+    variable_width = (
+        available_width - fixed_width
+    ) / max(len(income_types), 1)
+
     income_widths = (
         [32 * mm, 12 * mm]
-        + [20 * mm] * len(income_types)
-        + [24 * mm]
+        + [variable_width] * len(income_types)
+        + [12 * mm]
     )
 
     story.append(
         create_table(
             income_rows,
             widths=income_widths,
-            font_size=5.5,
+            font_size=5.2,
         )
     )
 
-    years = data["years"]
+    years = data.get("years", [])
+
+    if len(years) >= 2:
+        years_text = f"{years[0]} y {years[1]}"
+    else:
+        years_text = "los años solicitados"
 
     story.extend(
         [
             Spacer(1, 6 * mm),
             Paragraph(
                 f"Los montos corresponden a promedios mensuales de "
-                f"{years[0]} y {years[1]}. Confirma estos años y los "
-                f"criterios en el instructivo FUAS 2027 definitivo.",
+                f"{years_text}. Confirma los periodos y criterios en "
+                f"el instructivo FUAS 2027 definitivo.",
                 note_style,
             ),
-            Spacer(1, 3 * mm),
+            Spacer(1, 4 * mm),
             Paragraph(
-                "Este archivo se genera durante la sesión. Debes realizar "
-                "y finalizar la postulación exclusivamente en fuas.cl para "
-                "obtener un comprobante válido.",
-                note_style,
+                "<b>IMPORTANTE:</b> este archivo es solamente un "
+                "borrador de apoyo. Debes realizar y finalizar la "
+                "postulación exclusivamente en fuas.cl para obtener "
+                "un comprobante válido.",
+                warning_style,
             ),
         ]
     )
