@@ -11,7 +11,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# Confirmar estos años cuando se publique el instructivo FUAS 2027.
 INCOME_YEARS = [2025, 2026]
 
 INCOME_TYPES = [
@@ -24,6 +23,47 @@ INCOME_TYPES = [
     "Ganancias de capital",
     "Pensión alimenticia/aportes",
     "Actividades independientes",
+]
+
+ESTADOS_CIVILES = [
+    "Soltero/a",
+    "Casado/a",
+    "Divorciado/a",
+    "Viudo/a",
+    "Conviviente civil",
+    "Otro",
+]
+
+ACTIVIDADES = [
+    "Estudiante",
+    "Trabajador/a dependiente",
+    "Trabajador/a independiente",
+    "Cesante",
+    "Dueño/a de casa",
+    "Jubilado/a",
+    "Otra",
+]
+
+NIVELES_ESTUDIO = [
+    "Sin estudios",
+    "Educación básica incompleta",
+    "Educación básica completa",
+    "Enseñanza media incompleta",
+    "Enseñanza media completa",
+    "Educación superior incompleta",
+    "Educación superior completa",
+    "Postgrado",
+]
+
+PARENTESCOS = [
+    "Madre",
+    "Padre",
+    "Hermano/a",
+    "Cónyuge o pareja",
+    "Hijo/a",
+    "Abuelo/a",
+    "Otro familiar",
+    "No familiar",
 ]
 
 
@@ -69,69 +109,58 @@ st.markdown(
     <div class="hero">
         <h1>Borrador FUAS 2027</h1>
         <p>
-            Organiza tus antecedentes antes de completar la
-            postulación oficial.
+            Organiza tus antecedentes antes de completar
+            la postulación oficial.
         </p>
     </div>
 
     <div class="warning">
         <b>Documento no oficial.</b>
-        Esta herramienta no realiza una postulación, no reemplaza
-        a fuas.cl y no genera un comprobante del Mineduc.
+        Esta herramienta no realiza una postulación,
+        no reemplaza a fuas.cl y no genera un comprobante Mineduc.
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 st.caption(
-    "Privacidad: esta aplicación no utiliza una base de datos. "
-    "Los antecedentes permanecen solamente durante la sesión."
+    "Privacidad: los datos permanecen solamente durante esta sesión. "
+    "La aplicación no utiliza una base de datos."
 )
 
 
-# Datos iniciales del grupo familiar
-if "familia" not in st.session_state:
-    st.session_state.familia = pd.DataFrame(
-        [
-            {
-                "RUT": "",
-                "Nombre completo": "",
-                "Edad": 18,
-                "Estado civil": "Soltero/a",
-                "Parentesco": "Postulante",
-                "Actividad": "Estudiante",
-                "Nivel de estudios": "Enseñanza media",
-            }
-        ]
-    )
-
-if "ingresos_guardados" not in st.session_state:
-    st.session_state.ingresos_guardados = pd.DataFrame()
-
-
 # ---------------------------------------------------------
-# 1. DATOS PERSONALES
+# 1. DATOS DEL ESTUDIANTE
 # ---------------------------------------------------------
 
-st.subheader("1. Antecedentes de la persona postulante")
+st.subheader("1. Antecedentes del estudiante")
 
-column1, column2, column3 = st.columns(3)
+column1, column2, column3, column4 = st.columns(4)
 
-nombre = column1.text_input("Nombre completo *")
+nombre = column1.text_input(
+    "Nombre completo *",
+    key="nombre_estudiante",
+)
+
 rut = column2.text_input(
     "RUT *",
     placeholder="12.345.678-5",
+    key="rut_estudiante",
 )
-estado_civil = column3.selectbox(
+
+edad = column3.number_input(
+    "Edad *",
+    min_value=14,
+    max_value=120,
+    value=18,
+    step=1,
+    key="edad_estudiante",
+)
+
+estado_civil = column4.selectbox(
     "Estado civil",
-    [
-        "Soltero/a",
-        "Casado/a",
-        "Divorciado/a",
-        "Viudo/a",
-        "Conviviente civil",
-        "Otro",
-    ],
+    ESTADOS_CIVILES,
+    key="estado_estudiante",
 )
 
 column1, column2, column3 = st.columns(3)
@@ -166,7 +195,7 @@ salud = column3.selectbox(
         "No",
         "Sí, acreditada",
         "Sí, sin acreditar",
-        "Prefiero revisarlo en el portal oficial",
+        "Revisar en el portal oficial",
     ],
 )
 
@@ -186,14 +215,8 @@ nivel = column1.selectbox(
 
 actividad = column2.selectbox(
     "Actividad",
-    [
-        "Estudiante",
-        "Trabajador/a dependiente",
-        "Trabajador/a independiente",
-        "Cesante",
-        "Dueño/a de casa",
-        "Otra",
-    ],
+    ACTIVIDADES,
+    key="actividad_estudiante",
 )
 
 correo = column3.text_input("Correo electrónico *")
@@ -259,7 +282,7 @@ nem = column2.number_input(
 )
 
 media_chile = column3.radio(
-    "¿Cursaste los 4 niveles de enseñanza media en Chile?",
+    "¿Cursaste los cuatro niveles de enseñanza media en Chile?",
     ["Sí", "No"],
     horizontal=True,
 )
@@ -293,52 +316,136 @@ cuenta_ahorro = column3.radio(
 st.subheader("3. Integrantes del grupo familiar")
 
 st.info(
-    "Incluye a quienes comparten ingresos y gastos. "
-    "La persona postulante también debe aparecer en esta tabla."
+    "El estudiante se incorpora automáticamente como primer integrante. "
+    "Agrega solamente a las demás personas que comparten ingresos y gastos."
 )
 
-familia = st.data_editor(
-    st.session_state.familia,
-    num_rows="dynamic",
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "Edad": st.column_config.NumberColumn(
+nombre_mostrado = nombre.strip() or "Estudiante"
+
+with st.expander(
+    f"Integrante 1: {nombre_mostrado} — Estudiante",
+    expanded=True,
+):
+    column1, column2, column3, column4 = st.columns(4)
+
+    column1.text_input(
+        "Nombre completo",
+        value=nombre,
+        disabled=True,
+        key="resumen_nombre_estudiante",
+    )
+
+    column2.text_input(
+        "RUT",
+        value=format_rut(rut) if rut else "",
+        disabled=True,
+        key="resumen_rut_estudiante",
+    )
+
+    column3.number_input(
+        "Edad",
+        value=int(edad),
+        disabled=True,
+        key="resumen_edad_estudiante",
+    )
+
+    column4.text_input(
+        "Parentesco",
+        value="Postulante",
+        disabled=True,
+        key="resumen_parentesco_estudiante",
+    )
+
+cantidad_adicional = st.number_input(
+    "¿Cuántos integrantes adicionales tiene el grupo familiar?",
+    min_value=0,
+    max_value=15,
+    value=0,
+    step=1,
+)
+
+familia = [
+    {
+        "RUT": format_rut(rut) if rut else "",
+        "Nombre completo": nombre.strip(),
+        "Edad": int(edad),
+        "Estado civil": estado_civil,
+        "Parentesco": "Postulante",
+        "Actividad": actividad,
+        "Nivel de estudios": nivel,
+    }
+]
+
+for index in range(int(cantidad_adicional)):
+    number = index + 2
+
+    with st.expander(
+        f"Integrante {number}",
+        expanded=True,
+    ):
+        column1, column2, column3 = st.columns(3)
+
+        member_name = column1.text_input(
+            "Nombre completo *",
+            key=f"member_name_{index}",
+        )
+
+        member_rut = column2.text_input(
+            "RUT",
+            key=f"member_rut_{index}",
+            placeholder="12.345.678-5",
+        )
+
+        member_age = column3.number_input(
             "Edad",
             min_value=0,
             max_value=120,
+            value=18,
             step=1,
-        ),
-        "Estado civil": st.column_config.SelectboxColumn(
-            "Estado civil",
-            options=[
-                "Soltero/a",
-                "Casado/a",
-                "Divorciado/a",
-                "Viudo/a",
-                "Conviviente civil",
-                "Otro",
-            ],
-        ),
-        "Parentesco": st.column_config.SelectboxColumn(
-            "Parentesco",
-            options=[
-                "Postulante",
-                "Madre",
-                "Padre",
-                "Hermano/a",
-                "Cónyuge o pareja",
-                "Hijo/a",
-                "Abuelo/a",
-                "Otro familiar",
-                "No familiar",
-            ],
-        ),
-    },
-    key="editor_familia",
-)
+            key=f"member_age_{index}",
+        )
 
-st.session_state.familia = familia.copy()
+        column1, column2, column3, column4 = st.columns(4)
+
+        member_status = column1.selectbox(
+            "Estado civil",
+            ESTADOS_CIVILES,
+            key=f"member_status_{index}",
+        )
+
+        member_relation = column2.selectbox(
+            "Parentesco",
+            PARENTESCOS,
+            key=f"member_relation_{index}",
+        )
+
+        member_activity = column3.selectbox(
+            "Actividad",
+            ACTIVIDADES,
+            key=f"member_activity_{index}",
+        )
+
+        member_studies = column4.selectbox(
+            "Nivel de estudios",
+            NIVELES_ESTUDIO,
+            key=f"member_studies_{index}",
+        )
+
+        familia.append(
+            {
+                "RUT": (
+                    format_rut(member_rut)
+                    if member_rut
+                    else ""
+                ),
+                "Nombre completo": member_name.strip(),
+                "Edad": int(member_age),
+                "Estado civil": member_status,
+                "Parentesco": member_relation,
+                "Actividad": member_activity,
+                "Nivel de estudios": member_studies,
+            }
+        )
 
 
 # ---------------------------------------------------------
@@ -348,93 +455,73 @@ st.session_state.familia = familia.copy()
 st.subheader("4. Ingresos del grupo familiar")
 
 st.info(
-    "Escribe el promedio mensual de cada ingreso. "
-    "Para calcularlo, suma lo recibido entre enero y diciembre "
-    "y divide el resultado por 12."
+    "El estudiante aparece automáticamente primero. "
+    "Ingresa directamente el promedio mensual solicitado para cada año."
 )
 
-nombres_integrantes = []
+ingresos = []
 
-if "Nombre completo" in familia.columns:
-    nombres_integrantes = [
-        str(value).strip()
-        for value in familia["Nombre completo"].tolist()
-        if str(value).strip()
-    ]
-
-if not nombres_integrantes:
-    st.warning(
-        "Primero escribe el nombre de al menos un integrante "
-        "en la tabla anterior."
+for member_index, member in enumerate(familia):
+    member_name = (
+        member["Nombre completo"]
+        or f"Integrante {member_index + 1}"
     )
-    ingresos = pd.DataFrame()
-else:
-    filas_ingresos = []
 
-    for integrante in nombres_integrantes:
+    relation = member["Parentesco"]
+
+    with st.expander(
+        f"{member_index + 1}. {member_name} — {relation}",
+        expanded=(member_index == 0),
+    ):
         for year in INCOME_YEARS:
-            fila = {
-                "Nombre": integrante,
-                "Año": year,
-            }
+            st.markdown(f"#### Ingresos mensuales {year}")
 
-            for income_type in INCOME_TYPES:
-                fila[income_type] = 0.0
+            values = {}
+            columns = st.columns(3)
 
-            filas_ingresos.append(fila)
+            for income_index, income_type in enumerate(INCOME_TYPES):
+                selected_column = columns[income_index % 3]
 
-    ingresos_base = pd.DataFrame(filas_ingresos)
-
-    guardados = st.session_state.ingresos_guardados
-
-    if not guardados.empty:
-        ingresos_base = ingresos_base.merge(
-            guardados,
-            on=["Nombre", "Año"],
-            how="left",
-            suffixes=("", "_guardado"),
-        )
-
-        for income_type in INCOME_TYPES:
-            saved_column = income_type + "_guardado"
-
-            if saved_column in ingresos_base.columns:
-                ingresos_base[income_type] = (
-                    ingresos_base[saved_column]
-                    .fillna(ingresos_base[income_type])
+                values[income_type] = selected_column.number_input(
+                    income_type,
+                    min_value=0,
+                    value=0,
+                    step=1000,
+                    key=(
+                        f"income_{member_index}_"
+                        f"{year}_{income_index}"
+                    ),
                 )
 
-        ingresos_base = ingresos_base[
-            ["Nombre", "Año"] + INCOME_TYPES
-        ]
-
-    ingresos = st.data_editor(
-        ingresos_base,
-        use_container_width=True,
-        hide_index=True,
-        disabled=["Nombre", "Año"],
-        column_config={
-            income_type: st.column_config.NumberColumn(
-                income_type,
-                min_value=0,
-                step=1000,
-                format="$ %d",
+            total = sum(
+                nonnegative_number(value)
+                for value in values.values()
             )
-            for income_type in INCOME_TYPES
-        },
-        key="editor_ingresos",
-    )
+
+            st.metric(
+                f"Total mensual {year}",
+                f"${total:,.0f}".replace(",", "."),
+            )
+
+            ingresos.append(
+                {
+                    "Nombre": member_name,
+                    "Año": year,
+                    **values,
+                    "Total": total,
+                }
+            )
 
 
 # ---------------------------------------------------------
-# 5. VALIDACIÓN Y PDF
+# 5. REVISIÓN Y PDF
 # ---------------------------------------------------------
 
 st.subheader("5. Revisión y descarga")
 
 acepto = st.checkbox(
-    "Confirmo que revisaré estos antecedentes con mi grupo "
-    "familiar y los validaré en el portal oficial."
+    "Confirmo que revisaré estos antecedentes con mi grupo familiar "
+    "y los validaré en el portal oficial."
 )
 
 generar = st.button(
@@ -444,83 +531,41 @@ generar = st.button(
 )
 
 if generar:
-    errors = []
+    errores = []
 
     if not nombre.strip():
-        errors.append("Falta el nombre completo.")
+        errores.append("Falta el nombre completo del estudiante.")
 
     if not valid_rut(rut):
-        errors.append("El RUT de la persona postulante no es válido.")
+        errores.append("El RUT del estudiante no es válido.")
 
-    if (
-        "@" not in correo
-        or "." not in correo.split("@")[-1]
-    ):
-        errors.append("El correo electrónico no parece válido.")
+    if "@" not in correo or "." not in correo.split("@")[-1]:
+        errores.append("El correo electrónico no parece válido.")
 
-    if familia.empty:
-        errors.append(
-            "Debes incluir al menos un integrante del grupo familiar."
-        )
+    for index, member in enumerate(familia[1:], start=2):
+        if not member["Nombre completo"]:
+            errores.append(
+                f"Falta el nombre del integrante {index}."
+            )
 
-    if not nombres_integrantes:
-        errors.append(
-            "Completa el nombre de al menos un integrante."
-        )
-
-    if ingresos.empty:
-        errors.append(
-            "No se pudo crear la tabla de ingresos."
-        )
+        if (
+            member["RUT"]
+            and not valid_rut(member["RUT"])
+        ):
+            errores.append(
+                f"El RUT del integrante {index} no es válido."
+            )
 
     if not acepto:
-        errors.append(
+        errores.append(
             "Debes confirmar la revisión antes de generar el PDF."
         )
 
-    if "RUT" in familia.columns:
-        member_ruts = [
-            str(value).strip()
-            for value in familia["RUT"].tolist()
-            if str(value).strip()
-        ]
-
-        invalid_member_ruts = [
-            value
-            for value in member_ruts
-            if not valid_rut(value)
-        ]
-
-        if invalid_member_ruts:
-            errors.append(
-                "Hay RUT inválidos en el grupo familiar: "
-                + ", ".join(invalid_member_ruts)
-            )
-
-    if errors:
-        for error in errors:
+    if errores:
+        for error in errores:
             st.error(error)
 
     else:
-        ingresos_limpios = ingresos.copy()
-
-        for income_type in INCOME_TYPES:
-            ingresos_limpios[income_type] = (
-                ingresos_limpios[income_type]
-                .map(nonnegative_number)
-            )
-
-        ingresos_limpios["Total"] = (
-            ingresos_limpios[INCOME_TYPES]
-            .sum(axis=1)
-        )
-
-        st.session_state.ingresos_guardados = (
-            ingresos_limpios[
-                ["Nombre", "Año"] + INCOME_TYPES
-            ].copy()
-        )
-
         datos_pdf = {
             "postulante": {
                 "nombre": nombre.strip(),
@@ -549,12 +594,8 @@ if generar:
                 ),
                 "cuenta_ahorro": cuenta_ahorro,
             },
-            "familia": (
-                familia.fillna("").to_dict("records")
-            ),
-            "ingresos": (
-                ingresos_limpios.fillna(0).to_dict("records")
-            ),
+            "familia": familia,
+            "ingresos": ingresos,
             "income_types": INCOME_TYPES,
             "years": INCOME_YEARS,
         }
@@ -562,8 +603,19 @@ if generar:
         pdf = build_pdf(datos_pdf)
 
         st.success(
-            "Los antecedentes fueron validados. "
-            "Ya puedes descargar el borrador."
+            "Los antecedentes fueron validados correctamente."
+        )
+
+        total_2025 = sum(
+            row["Total"]
+            for row in ingresos
+            if row["Año"] == 2025
+        )
+
+        total_2026 = sum(
+            row["Total"]
+            for row in ingresos
+            if row["Año"] == 2026
         )
 
         metric1, metric2, metric3 = st.columns(3)
@@ -573,24 +625,14 @@ if generar:
             len(familia),
         )
 
-        total_year_1 = ingresos_limpios.loc[
-            ingresos_limpios["Año"] == INCOME_YEARS[0],
-            "Total",
-        ].sum()
-
-        total_year_2 = ingresos_limpios.loc[
-            ingresos_limpios["Año"] == INCOME_YEARS[1],
-            "Total",
-        ].sum()
-
         metric2.metric(
-            f"Ingreso mensual {INCOME_YEARS[0]}",
-            f"${total_year_1:,.0f}".replace(",", "."),
+            "Ingreso mensual 2025",
+            f"${total_2025:,.0f}".replace(",", "."),
         )
 
         metric3.metric(
-            f"Ingreso mensual {INCOME_YEARS[1]}",
-            f"${total_year_2:,.0f}".replace(",", "."),
+            "Ingreso mensual 2026",
+            f"${total_2026:,.0f}".replace(",", "."),
         )
 
         st.download_button(
@@ -607,8 +649,8 @@ st.divider()
 
 st.markdown(
     """
-    **Importante:** para postular y obtener un comprobante válido,
-    debes ingresar al sitio oficial
+    **Importante:** la postulación y el comprobante válido
+    se obtienen exclusivamente en
     [fuas.cl](https://fuas.cl).
     """
 )
