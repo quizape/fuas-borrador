@@ -45,7 +45,7 @@ ACTIVIDADES = [
     "Otra",
 ]
 
-NIVELES_FAMILIA = [
+NIVELES_ESTUDIO = [
     "Sin estudios",
     "Educación básica incompleta",
     "Educación básica completa",
@@ -105,12 +105,12 @@ st.markdown(
 
     .hero h1 {
         margin: 0;
-        font-size: 2rem;
+        font-size: 2.1rem;
     }
 
     .hero p {
         margin: 0.4rem 0 0;
-        font-size: 1.05rem;
+        font-size: 1.1rem;
     }
 
     .disclaimer {
@@ -119,27 +119,33 @@ st.markdown(
         padding: 1rem 1.1rem;
         border-radius: 7px;
         margin: 1rem 0;
-        font-size: 1.1rem;
+        font-size: 1.15rem;
         font-weight: 700;
         line-height: 1.5;
     }
 
-    .student-table {
+    .member-table {
         width: 100%;
         border-collapse: collapse;
-        margin: 0.7rem 0 1rem;
+        margin: 0.8rem 0 1.2rem;
     }
 
-    .student-table th {
+    .member-table th {
         background: #0B5CAD;
         color: white;
         padding: 9px;
         text-align: left;
+        font-size: 0.9rem;
     }
 
-    .student-table td {
+    .member-table td {
+        border: 1px solid #c7d2dc;
         padding: 9px;
-        border: 1px solid #c8d3dc;
+        font-size: 0.9rem;
+    }
+
+    .member-table tr:nth-child(even) {
+        background: #eef5fa;
     }
 
     [data-testid="stMetricValue"] {
@@ -147,7 +153,7 @@ st.markdown(
     }
     </style>
 
-    <div class="hero">
+    <div class="hero" translate="no">
         <h1>Borrador FUAS 2027</h1>
         <p>
             Organiza tus antecedentes antes de completar
@@ -155,7 +161,7 @@ st.markdown(
         </p>
     </div>
 
-    <div class="disclaimer">
+    <div class="disclaimer" translate="no">
         DOCUMENTO NO OFICIAL: esta herramienta no realiza una
         postulación, no reemplaza a fuas.cl y no genera un
         comprobante del Ministerio de Educación.
@@ -171,7 +177,7 @@ st.caption(
 
 
 # ---------------------------------------------------------
-# ESTADO DE LA APLICACIÓN
+# ESTADO
 # ---------------------------------------------------------
 
 if "student" not in st.session_state:
@@ -180,9 +186,6 @@ if "student" not in st.session_state:
 if "family_members" not in st.session_state:
     st.session_state.family_members = []
 
-if "family_count" not in st.session_state:
-    st.session_state.family_count = 0
-
 if "saved_incomes" not in st.session_state:
     st.session_state.saved_incomes = []
 
@@ -190,15 +193,15 @@ if "pdf_bytes" not in st.session_state:
     st.session_state.pdf_bytes = None
 
 
-def select_index(options, value):
-    if value in options:
-        return options.index(value)
+def option_index(options, selected):
+    if selected in options:
+        return options.index(selected)
     return 0
 
 
 def student_as_member(student):
     return {
-        "RUT": student["rut"],
+        "RUT": student["cedula"],
         "Nombre completo": student["nombre"],
         "Edad": student["edad"],
         "Estado civil": student["estado_civil"],
@@ -208,59 +211,67 @@ def student_as_member(student):
     }
 
 
-def show_student_row(student):
-    values = [
-        student["rut"],
-        student["nombre"],
-        student["edad"],
-        student["estado_civil"],
-        "Postulante",
-        student["actividad"],
-        student["nivel"],
-    ]
+def show_family_table(members):
+    rows = ""
 
-    escaped = [html.escape(str(value)) for value in values]
+    for position, member in enumerate(members, start=1):
+        values = [
+            position,
+            member["Nombre completo"],
+            member["RUT"],
+            member["Edad"],
+            member["Estado civil"],
+            member["Parentesco"],
+            member["Actividad"],
+            member["Nivel de estudios"],
+        ]
+
+        cells = "".join(
+            f"<td>{html.escape(str(value))}</td>"
+            for value in values
+        )
+
+        rows += f"<tr>{cells}</tr>"
 
     st.markdown(
         f"""
-        <table class="student-table">
-            <thead>
-                <tr>
-                    <th>RUT</th>
-                    <th>Nombre completo</th>
-                    <th>Edad</th>
-                    <th>Estado civil</th>
-                    <th>Parentesco</th>
-                    <th>Actividad</th>
-                    <th>Nivel de estudios</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>{escaped[0]}</td>
-                    <td>{escaped[1]}</td>
-                    <td>{escaped[2]}</td>
-                    <td>{escaped[3]}</td>
-                    <td>{escaped[4]}</td>
-                    <td>{escaped[5]}</td>
-                    <td>{escaped[6]}</td>
-                </tr>
-            </tbody>
-        </table>
+        <div translate="no">
+            <table class="member-table">
+                <thead>
+                    <tr>
+                        <th>N.º</th>
+                        <th>Nombre completo</th>
+                        <th>Cédula de identidad</th>
+                        <th>Edad</th>
+                        <th>Estado civil</th>
+                        <th>Parentesco</th>
+                        <th>Actividad</th>
+                        <th>Nivel de estudios</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows}
+                </tbody>
+            </table>
+        </div>
         """,
         unsafe_allow_html=True,
     )
 
 
 # ---------------------------------------------------------
-# 1. DATOS DEL ESTUDIANTE
+# 1. ESTUDIANTE
 # ---------------------------------------------------------
 
 st.subheader("1. Antecedentes del estudiante")
 
 saved_student = st.session_state.student or {}
 
-with st.form("student_form"):
+with st.form(
+    "student_form",
+    clear_on_submit=False,
+    enter_to_submit=False,
+):
     column1, column2, column3, column4 = st.columns(4)
 
     nombre = column1.text_input(
@@ -268,9 +279,9 @@ with st.form("student_form"):
         value=saved_student.get("nombre", ""),
     )
 
-    rut = column2.text_input(
-        "RUT *",
-        value=saved_student.get("rut", ""),
+    cedula = column2.text_input(
+        "Cédula de identidad *",
+        value=saved_student.get("cedula", ""),
         placeholder="12.345.678-5",
     )
 
@@ -285,7 +296,7 @@ with st.form("student_form"):
     estado_civil = column4.selectbox(
         "Estado civil",
         ESTADOS_CIVILES,
-        index=select_index(
+        index=option_index(
             ESTADOS_CIVILES,
             saved_student.get("estado_civil", "Soltero/a"),
         ),
@@ -296,7 +307,7 @@ with st.form("student_form"):
     nacionalidad = column1.selectbox(
         "Nacionalidad",
         ["Chilena", "Extranjera"],
-        index=select_index(
+        index=option_index(
             ["Chilena", "Extranjera"],
             saved_student.get("nacionalidad", "Chilena"),
         ),
@@ -321,7 +332,7 @@ with st.form("student_form"):
     pueblo = column2.selectbox(
         "Pueblo originario",
         pueblo_options,
-        index=select_index(
+        index=option_index(
             pueblo_options,
             saved_student.get("pueblo", "No pertenece"),
         ),
@@ -337,7 +348,7 @@ with st.form("student_form"):
     salud = column3.selectbox(
         "Condición de salud o discapacidad",
         salud_options,
-        index=select_index(
+        index=option_index(
             salud_options,
             saved_student.get("salud", "No"),
         ),
@@ -357,7 +368,7 @@ with st.form("student_form"):
     nivel = column1.selectbox(
         "Nivel de estudio",
         nivel_options,
-        index=select_index(
+        index=option_index(
             nivel_options,
             saved_student.get("nivel", "4° medio"),
         ),
@@ -366,7 +377,7 @@ with st.form("student_form"):
     actividad = column2.selectbox(
         "Actividad",
         ACTIVIDADES,
-        index=select_index(
+        index=option_index(
             ACTIVIDADES,
             saved_student.get("actividad", "Estudiante"),
         ),
@@ -399,7 +410,7 @@ with st.form("student_form"):
     region = column2.selectbox(
         "Región",
         REGIONES,
-        index=select_index(
+        index=option_index(
             REGIONES,
             saved_student.get("region", "Metropolitana"),
         ),
@@ -421,7 +432,7 @@ with st.form("student_form"):
     tipo_establecimiento = column1.selectbox(
         "Tipo de establecimiento de egreso",
         establishment_options,
-        index=select_index(
+        index=option_index(
             establishment_options,
             saved_student.get(
                 "tipo_establecimiento",
@@ -441,7 +452,7 @@ with st.form("student_form"):
     media_chile = column3.radio(
         "¿Cursaste los cuatro niveles de enseñanza media en Chile?",
         ["Sí", "No"],
-        index=select_index(
+        index=option_index(
             ["Sí", "No"],
             saved_student.get("media_chile", "Sí"),
         ),
@@ -467,7 +478,7 @@ with st.form("student_form"):
     cuenta_ahorro = column3.radio(
         "¿Cuenta de ahorro para educación superior?",
         ["No", "Sí"],
-        index=select_index(
+        index=option_index(
             ["No", "Sí"],
             saved_student.get("cuenta_ahorro", "No"),
         ),
@@ -480,25 +491,32 @@ with st.form("student_form"):
         use_container_width=True,
     )
 
+
 if save_student:
-    errors = []
+    student_errors = []
 
     if not nombre.strip():
-        errors.append("Falta el nombre completo.")
+        student_errors.append("Falta el nombre completo.")
 
-    if not valid_rut(rut):
-        errors.append("El RUT ingresado no es válido.")
+    if not valid_rut(cedula):
+        student_errors.append(
+            "La cédula de identidad ingresada no es válida."
+        )
 
     if "@" not in correo or "." not in correo.split("@")[-1]:
-        errors.append("El correo electrónico no parece válido.")
+        student_errors.append(
+            "El correo electrónico no parece válido."
+        )
 
-    if errors:
-        for error in errors:
+    if student_errors:
+        for error in student_errors:
             st.error(error)
     else:
+        previous_student = st.session_state.student
+
         st.session_state.student = {
             "nombre": nombre.strip(),
-            "rut": format_rut(rut),
+            "cedula": format_rut(cedula),
             "edad": int(edad),
             "estado_civil": estado_civil,
             "nacionalidad": nacionalidad,
@@ -519,17 +537,17 @@ if save_student:
             "cuenta_ahorro": cuenta_ahorro,
         }
 
-        st.session_state.saved_incomes = []
-        st.session_state.pdf_bytes = None
+        if previous_student != st.session_state.student:
+            st.session_state.saved_incomes = []
+            st.session_state.pdf_bytes = None
 
-        st.success("Datos del estudiante guardados.")
-        st.rerun()
+        st.success("Datos del estudiante guardados correctamente.")
 
 
-# Las siguientes secciones aparecen después de guardar al estudiante.
 if st.session_state.student is None:
     st.info(
-        "Completa y guarda primero los antecedentes del estudiante."
+        "Completa y guarda los antecedentes del estudiante "
+        "para continuar."
     )
     st.stop()
 
@@ -544,151 +562,145 @@ student = st.session_state.student
 st.subheader("2. Integrantes del grupo familiar")
 
 st.info(
-    "El estudiante aparece automáticamente como primer integrante. "
+    "El postulante se incorpora automáticamente como integrante 1. "
     "Agrega solamente a las demás personas del grupo familiar."
 )
 
-show_student_row(student)
+family = [
+    student_as_member(student),
+    *st.session_state.family_members,
+]
 
-st.number_input(
-    "Cantidad de integrantes adicionales",
-    min_value=0,
-    max_value=15,
-    step=1,
-    key="family_count",
-)
+# Aquí siempre se muestra al estudiante en la primera fila.
+show_family_table(family)
 
-with st.form("family_form"):
-    new_family_members = []
+st.markdown("#### Agregar otro integrante")
 
-    for index in range(int(st.session_state.family_count)):
-        saved = (
-            st.session_state.family_members[index]
-            if index < len(st.session_state.family_members)
-            else {}
-        )
+with st.form(
+    "add_family_member_form",
+    clear_on_submit=True,
+    enter_to_submit=False,
+):
+    column1, column2, column3 = st.columns(3)
 
-        with st.expander(
-            f"Integrante {index + 2}",
-            expanded=True,
-        ):
-            column1, column2, column3 = st.columns(3)
+    member_name = column1.text_input(
+        "Nombre completo *",
+        key="new_member_name",
+    )
 
-            member_name = column1.text_input(
-                "Nombre completo *",
-                value=saved.get("Nombre completo", ""),
-                key=f"family_name_{index}",
-            )
+    member_cedula = column2.text_input(
+        "Cédula de identidad",
+        placeholder="12.345.678-5",
+        key="new_member_cedula",
+    )
 
-            member_rut = column2.text_input(
-                "RUT",
-                value=saved.get("RUT", ""),
-                placeholder="12.345.678-5",
-                key=f"family_rut_{index}",
-            )
+    member_age = column3.number_input(
+        "Edad",
+        min_value=0,
+        max_value=120,
+        value=18,
+        step=1,
+        key="new_member_age",
+    )
 
-            member_age = column3.number_input(
-                "Edad",
-                min_value=0,
-                max_value=120,
-                value=int(saved.get("Edad", 18)),
-                step=1,
-                key=f"family_age_{index}",
-            )
+    column1, column2, column3, column4 = st.columns(4)
 
-            column1, column2, column3, column4 = st.columns(4)
+    member_status = column1.selectbox(
+        "Estado civil",
+        ESTADOS_CIVILES,
+        key="new_member_status",
+    )
 
-            member_status = column1.selectbox(
-                "Estado civil",
-                ESTADOS_CIVILES,
-                index=select_index(
-                    ESTADOS_CIVILES,
-                    saved.get("Estado civil", "Soltero/a"),
-                ),
-                key=f"family_status_{index}",
-            )
+    member_relation = column2.selectbox(
+        "Parentesco",
+        PARENTESCOS,
+        key="new_member_relation",
+    )
 
-            member_relation = column2.selectbox(
-                "Parentesco",
-                PARENTESCOS,
-                index=select_index(
-                    PARENTESCOS,
-                    saved.get("Parentesco", "Madre"),
-                ),
-                key=f"family_relation_{index}",
-            )
+    member_activity = column3.selectbox(
+        "Actividad",
+        ACTIVIDADES,
+        key="new_member_activity",
+    )
 
-            member_activity = column3.selectbox(
-                "Actividad",
-                ACTIVIDADES,
-                index=select_index(
-                    ACTIVIDADES,
-                    saved.get("Actividad", "Estudiante"),
-                ),
-                key=f"family_activity_{index}",
-            )
+    member_studies = column4.selectbox(
+        "Nivel de estudios",
+        NIVELES_ESTUDIO,
+        key="new_member_studies",
+    )
 
-            member_studies = column4.selectbox(
-                "Nivel de estudios",
-                NIVELES_FAMILIA,
-                index=select_index(
-                    NIVELES_FAMILIA,
-                    saved.get(
-                        "Nivel de estudios",
-                        "Enseñanza media completa",
-                    ),
-                ),
-                key=f"family_studies_{index}",
-            )
-
-            new_family_members.append(
-                {
-                    "RUT": (
-                        format_rut(member_rut)
-                        if member_rut
-                        else ""
-                    ),
-                    "Nombre completo": member_name.strip(),
-                    "Edad": int(member_age),
-                    "Estado civil": member_status,
-                    "Parentesco": member_relation,
-                    "Actividad": member_activity,
-                    "Nivel de estudios": member_studies,
-                }
-            )
-
-    save_family = st.form_submit_button(
-        "Guardar grupo familiar",
+    add_member = st.form_submit_button(
+        "Agregar integrante",
         type="primary",
         use_container_width=True,
     )
 
-if save_family:
-    family_errors = []
 
-    for index, member in enumerate(new_family_members, start=2):
-        if not member["Nombre completo"]:
-            family_errors.append(
-                f"Falta el nombre del integrante {index}."
-            )
+if add_member:
+    member_errors = []
 
-        if member["RUT"] and not valid_rut(member["RUT"]):
-            family_errors.append(
-                f"El RUT del integrante {index} no es válido."
-            )
+    if not member_name.strip():
+        member_errors.append(
+            "Debes escribir el nombre del integrante."
+        )
 
-    if family_errors:
-        for error in family_errors:
+    if member_cedula and not valid_rut(member_cedula):
+        member_errors.append(
+            "La cédula de identidad del integrante no es válida."
+        )
+
+    if member_errors:
+        for error in member_errors:
             st.error(error)
     else:
-        st.session_state.family_members = new_family_members
+        st.session_state.family_members.append(
+            {
+                "RUT": (
+                    format_rut(member_cedula)
+                    if member_cedula
+                    else ""
+                ),
+                "Nombre completo": member_name.strip(),
+                "Edad": int(member_age),
+                "Estado civil": member_status,
+                "Parentesco": member_relation,
+                "Actividad": member_activity,
+                "Nivel de estudios": member_studies,
+            }
+        )
+
         st.session_state.saved_incomes = []
         st.session_state.pdf_bytes = None
-
-        st.success("Grupo familiar guardado.")
         st.rerun()
 
 
+if st.session_state.family_members:
+    st.markdown("#### Eliminar un integrante")
+
+    delete_options = {
+        (
+            f"{index + 2}. "
+            f"{member['Nombre completo']} — "
+            f"{member['Parentesco']}"
+        ): index
+        for index, member
+        in enumerate(st.session_state.family_members)
+    }
+
+    selected_member = st.selectbox(
+        "Selecciona el integrante",
+        list(delete_options.keys()),
+    )
+
+    if st.button("Eliminar integrante"):
+        selected_index = delete_options[selected_member]
+        st.session_state.family_members.pop(selected_index)
+        st.session_state.saved_incomes = []
+        st.session_state.pdf_bytes = None
+        st.rerun()
+
+
+# Reconstruir la familia después de agregar o eliminar.
 family = [
     student_as_member(student),
     *st.session_state.family_members,
@@ -702,11 +714,15 @@ family = [
 st.subheader("3. Ingresos del grupo familiar")
 
 st.info(
-    "El estudiante aparece automáticamente en primer lugar. "
-    "Ingresa el promedio mensual correspondiente a cada año."
+    "El postulante aparece automáticamente en primer lugar. "
+    "Ingresa el promedio mensual solicitado para cada año."
 )
 
-with st.form("income_form"):
+with st.form(
+    "income_form",
+    clear_on_submit=False,
+    enter_to_submit=False,
+):
     income_rows = []
 
     for member_index, member in enumerate(family):
@@ -723,25 +739,25 @@ with st.form("income_form"):
                 columns = st.columns(3)
                 values = {}
 
-                for income_index, income_type in enumerate(INCOME_TYPES):
-                    saved_value = 0
+                saved_row = next(
+                    (
+                        row
+                        for row in st.session_state.saved_incomes
+                        if row["Nombre"] == member_name
+                        and row["Año"] == year
+                    ),
+                    {},
+                )
 
-                    for saved_row in st.session_state.saved_incomes:
-                        if (
-                            saved_row["Nombre"] == member_name
-                            and saved_row["Año"] == year
-                        ):
-                            saved_value = int(
-                                saved_row.get(income_type, 0)
-                            )
-                            break
-
+                for income_index, income_type in enumerate(
+                    INCOME_TYPES
+                ):
                     values[income_type] = columns[
                         income_index % 3
                     ].number_input(
                         income_type,
                         min_value=0,
-                        value=saved_value,
+                        value=int(saved_row.get(income_type, 0)),
                         step=1000,
                         key=(
                             f"income_{member_index}_"
@@ -760,18 +776,17 @@ with st.form("income_form"):
                     }
                 )
 
-    save_income = st.form_submit_button(
+    save_incomes = st.form_submit_button(
         "Guardar ingresos",
         type="primary",
         use_container_width=True,
     )
 
-if save_income:
+
+if save_incomes:
     st.session_state.saved_incomes = income_rows
     st.session_state.pdf_bytes = None
-
     st.success("Ingresos guardados correctamente.")
-    st.rerun()
 
 
 # ---------------------------------------------------------
@@ -782,7 +797,7 @@ st.subheader("4. Revisión y descarga")
 
 if not st.session_state.saved_incomes:
     st.warning(
-        "Guarda primero los ingresos para poder generar el PDF."
+        "Guarda primero los ingresos para preparar el PDF."
     )
 else:
     total_2025 = sum(
@@ -829,7 +844,7 @@ else:
             pdf_data = {
                 "postulante": {
                     "nombre": student["nombre"],
-                    "rut": student["rut"],
+                    "rut": student["cedula"],
                     "estado_civil": student["estado_civil"],
                     "nacionalidad": student["nacionalidad"],
                     "pueblo": student["pueblo"],
@@ -878,7 +893,7 @@ else:
 
 st.markdown(
     """
-    <div class="disclaimer">
+    <div class="disclaimer" translate="no">
         IMPORTANTE: este PDF es solamente un borrador de apoyo.
         La postulación y el comprobante válido se obtienen
         exclusivamente en fuas.cl.
